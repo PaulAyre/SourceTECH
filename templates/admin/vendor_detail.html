@@ -1,0 +1,143 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ vendor.vendor_name }} - SourceTECH Admin{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('admin_vendors') }}">Vendors</a></li>
+        <li class="breadcrumb-item active">{{ vendor.vendor_name }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">{{ vendor.vendor_name }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Status:</strong>
+                            {% if vendor.status == 'complete' %}
+                                <span class="badge bg-success">Complete</span>
+                            {% elif vendor.status == 'processing' %}
+                                <span class="badge bg-info">Processing</span>
+                            {% elif vendor.status == 'error' %}
+                                <span class="badge bg-danger">Error</span>
+                            {% else %}
+                                <span class="badge bg-warning">Pending</span>
+                            {% endif %}
+                        </p>
+                        <p><strong>Account Manager:</strong> {{ vendor.dm_name }}</p>
+                        <p><strong>Email:</strong> {{ vendor.dm_email }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Created:</strong> {{ vendor.created_at }}</p>
+                        <p><strong>Last Submission:</strong> {{ vendor.last_submission_at or 'Never' }}</p>
+                        <p><strong>Reference:</strong> <code>{{ vendor.url_code }}</code></p>
+                    </div>
+                </div>
+
+                {% if vendor.notes %}
+                <hr>
+                <p><strong>Notes:</strong></p>
+                <p class="text-muted">{{ vendor.notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Submission History
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>File</th>
+                            <th>Status</th>
+                            <th>Policies</th>
+                            <th>Submitted</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in submissions %}
+                        <tr>
+                            <td>
+                                {{ sub.original_filename or 'Unknown' }}
+                                {% if sub.validation_errors %}
+                                <br><small class="text-danger">{{ sub.validation_errors[:100] }}...</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if sub.pavtech_status == 'complete' %}
+                                    <span class="badge bg-success">Valued</span>
+                                {% elif sub.pavtech_status == 'processing' %}
+                                    <span class="badge bg-info">Processing</span>
+                                {% elif sub.pavtech_status == 'error' %}
+                                    <span class="badge bg-danger">Error</span>
+                                {% elif sub.pavtech_status == 'validation_failed' %}
+                                    <span class="badge bg-warning">Validation Failed</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ sub.pavtech_status or 'Unknown' }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ sub.policy_count or '-' }}</td>
+                            <td>{{ sub.submitted_at }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                No submissions yet
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">Upload Link</div>
+            <div class="card-body">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control form-control-sm" id="upload-url"
+                           value="{{ upload_url }}" readonly>
+                    <button class="btn btn-outline-primary btn-sm" type="button" onclick="copyLink()">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                </div>
+                <a href="{{ upload_url }}" target="_blank" class="btn btn-outline-info btn-sm w-100">
+                    <i class="bi bi-box-arrow-up-right"></i> Open Upload Page
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyLink() {
+    const input = document.getElementById('upload-url');
+    input.select();
+    document.execCommand('copy');
+
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="bi bi-check"></i>';
+    btn.classList.remove('btn-outline-primary');
+    btn.classList.add('btn-success');
+
+    setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-primary');
+    }, 2000);
+}
+</script>
+{% endblock %}

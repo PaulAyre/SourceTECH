@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Create Vendor - SourceTECH Admin{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Create Vendor Upload Link</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="vendor_name" class="form-label">Vendor/Practice Name *</label>
+                        <input type="text" class="form-control" id="vendor_name" name="vendor_name"
+                               value="{{ form.vendor_name if form else '' }}" required
+                               placeholder="e.g., Smith Financial Services">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dm_name" class="form-label">Account Manager (DM) Name *</label>
+                        <input type="text" class="form-control" id="dm_name" name="dm_name"
+                               value="{{ form.dm_name if form else '' }}" required
+                               placeholder="e.g., Sarah Johnson">
+                        <div class="form-text">This person will receive the valuation results</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dm_email" class="form-label">Account Manager Email *</label>
+                        <input type="email" class="form-control" id="dm_email" name="dm_email"
+                               value="{{ form.dm_email if form else '' }}" required
+                               placeholder="e.g., sarah@company.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes (optional)</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"
+                                  placeholder="e.g., Referred by Mike. Expecting ~500 policies.">{{ form.notes if form else '' }}</textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-link-45deg"></i> Create Link
+                        </button>
+                        <a href="{{ url_for('admin_vendors') }}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6><i class="bi bi-info-circle"></i> How it works</h6>
+                <ol class="small mb-0">
+                    <li>Create a vendor link here</li>
+                    <li>Send the link to the vendor</li>
+                    <li>Vendor uploads their portfolio</li>
+                    <li>PII is automatically stripped</li>
+                    <li>File is processed through PavTECH</li>
+                    <li>DM receives valuation by email</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

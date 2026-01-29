@@ -1,0 +1,71 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Vendors - SourceTECH Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Vendors</h2>
+    <a href="{{ url_for('admin_create_vendor') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> New Vendor
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Vendor Name</th>
+                    <th>DM</th>
+                    <th>Status</th>
+                    <th>Submissions</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vendor in vendors %}
+                <tr>
+                    <td>
+                        <strong>{{ vendor.vendor_name }}</strong>
+                        <br>
+                        <small class="text-muted">{{ vendor.url_code }}</small>
+                    </td>
+                    <td>
+                        {{ vendor.dm_name }}
+                        <br>
+                        <small class="text-muted">{{ vendor.dm_email }}</small>
+                    </td>
+                    <td>
+                        {% if vendor.status == 'complete' %}
+                            <span class="badge bg-success">Complete</span>
+                        {% elif vendor.status == 'processing' %}
+                            <span class="badge bg-info">Processing</span>
+                        {% elif vendor.status == 'error' %}
+                            <span class="badge bg-danger">Error</span>
+                        {% else %}
+                            <span class="badge bg-warning">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ vendor.submission_count or 0 }}</td>
+                    <td>{{ vendor.created_at[:10] if vendor.created_at else '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('admin_vendor_detail', url_code=vendor.url_code) }}"
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        No vendors yet.
+                        <a href="{{ url_for('admin_create_vendor') }}">Create one</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

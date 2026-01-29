@@ -1,0 +1,152 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard - SourceTECH Admin{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Dashboard</h2>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h3 class="card-title">{{ stats.total_vendors }}</h3>
+                <p class="card-text mb-0">Total Vendors</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h3 class="card-title">{{ stats.pending_vendors }}</h3>
+                <p class="card-text mb-0">Pending</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h3 class="card-title">{{ stats.processing_vendors }}</h3>
+                <p class="card-text mb-0">Processing</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h3 class="card-title">{{ stats.complete_vendors }}</h3>
+                <p class="card-text mb-0">Complete</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history"></i> Recent Submissions</span>
+        <a href="{{ url_for('admin_vendors') }}" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Vendor</th>
+                    <th>DM</th>
+                    <th>Files</th>
+                    <th>Status</th>
+                    <th>Submitted</th>
+                    <th>Progress</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sub in recent_submissions %}
+                <tr>
+                    <td>
+                        <strong>{{ sub.vendor_name }}</strong>
+                    </td>
+                    <td>{{ sub.dm_name }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark">{{ sub.file_count or '?' }} files</span>
+                    </td>
+                    <td>
+                        {% if sub.pavtech_status == 'complete' %}
+                            <span class="badge bg-success">✅ Valued</span>
+                        {% elif sub.pavtech_status == 'processing' %}
+                            <span class="badge bg-info">⚙️ Processing</span>
+                        {% elif sub.pavtech_status == 'error' %}
+                            <span class="badge bg-danger">❌ Error</span>
+                        {% elif sub.pavtech_status == 'validation_failed' %}
+                            <span class="badge bg-warning text-dark">⚠️ Validation</span>
+                        {% elif sub.pavtech_status == 'submitted' %}
+                            <span class="badge bg-primary">📤 Submitted</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ sub.pavtech_status or 'Pending' }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <small class="text-muted">{{ sub.submitted_at[:16] if sub.submitted_at else 'N/A' }}</small>
+                    </td>
+                    <td>
+                        {% if sub.pavtech_status == 'processing' %}
+                            <div class="progress" style="height: 6px; width: 80px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 50%"></div>
+                            </div>
+                        {% elif sub.pavtech_status == 'complete' %}
+                            <span class="text-success">✓ Done</span>
+                        {% elif sub.pavtech_status == 'error' %}
+                            <span class="text-danger small">See details</span>
+                        {% else %}
+                            <span class="text-muted small">Waiting</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('admin_vendor_detail', url_code=sub.url_code) }}"
+                           class="btn btn-sm btn-outline-secondary">
+                            View
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No submissions yet
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Live Processing Queue -->
+<div class="card mt-4">
+    <div class="card-header">
+        <i class="bi bi-activity"></i> Currently Processing
+    </div>
+    <div class="card-body">
+        {% set processing = recent_submissions|selectattr('pavtech_status', 'equalto', 'processing')|list %}
+        {% if processing %}
+            {% for sub in processing %}
+            <div class="d-flex align-items-center mb-3 p-3 bg-light rounded">
+                <div class="spinner-border spinner-border-sm text-primary me-3" role="status"></div>
+                <div class="flex-grow-1">
+                    <strong>{{ sub.vendor_name }}</strong>
+                    <span class="text-muted">• {{ sub.file_count or '?' }} files • Started {{ sub.submitted_at[:16] if sub.submitted_at else 'recently' }}</span>
+                </div>
+                <small class="text-muted">DM: {{ sub.dm_name }}</small>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted mb-0 text-center py-3">
+                <i class="bi bi-check-circle"></i> No active processing. All caught up!
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('admin_create_vendor') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Create New Vendor Link
+    </a>
+</div>
+{% endblock %}

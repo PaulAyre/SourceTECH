@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Upload - {{ vendor.vendor_name }}</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            /* Larger base font for older users */
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #1a1a2e;
+            margin: 0 0 8px 0;
+            font-size: 2rem;
+        }
+
+        h2 {
+            color: #1a1a2e;
+            margin: 0 0 20px 0;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 12px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        /* Large dropzone for easy targeting */
+        .dropzone {
+            border: 4px dashed #667eea;
+            border-radius: 16px;
+            padding: 60px 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .dropzone:hover, .dropzone.dragover {
+            background: #eef0ff;
+            border-color: #5a67d8;
+            transform: scale(1.02);
+        }
+
+        .dropzone-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        .dropzone-text {
+            font-size: 1.4rem;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .dropzone-hint {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        /* File input hidden but accessible */
+        #file-input {
+            display: none;
+        }
+
+        /* File list */
+        .file-list {
+            margin-top: 20px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 5px solid #28a745;
+        }
+
+        .file-item.warning {
+            border-left-color: #ffc107;
+        }
+
+        .file-item.error {
+            border-left-color: #dc3545;
+        }
+
+        .file-item.uploading {
+            border-left-color: #667eea;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .file-icon {
+            font-size: 2.5rem;
+            margin-right: 20px;
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .file-meta {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            font-size: 1rem;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* Processing summary */
+        .summary-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #f0f7ff;
+            border-radius: 12px;
+            border: 1px solid #d0e3ff;
+        }
+
+        .summary-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .summary-item {
+            padding: 8px 0;
+            font-size: 1rem;
+            border-bottom: 1px solid #e0e8f0;
+        }
+
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+
+        .summary-item.positive {
+            color: #155724;
+        }
+
+        .summary-item.warning {
+            color: #856404;
+        }
+
+        .summary-item.info {
+            color: #0c5460;
+        }
+
+        /* Valuation display */
+        .valuation-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 30px;
+        }
+
+        .valuation-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .valuation-amount {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .valuation-note {
+            font-size: 0.95rem;
+            opacity: 0.8;
+            margin-top: 12px;
+        }
+
+        /* Status badge */
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .status-pending { background: #e2e3e5; color: #383d41; }
+        .status-processing { background: #cce5ff; color: #004085; }
+        .status-complete { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+
+        /* Confirmation modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h3 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+        }
+
+        .modal p {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        /* Progress indicator */
+        .progress-bar {
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            padding: 20px 30px;
+            background: #333;
+            color: white;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            z-index: 1001;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        .toast.warning { background: #ffc107; color: #333; }
+
+        /* Privacy info */
+        .privacy-info {
+            background: #e8f5e9;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .privacy-info h4 {
+            color: #2e7d32;
+            margin: 0 0 12px 0;
+            font-size: 1.1rem;
+        }
+
+        .privacy-info ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #555;
+        }
+
+        .privacy-info li {
+            margin-bottom: 6px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            body { padding: 12px; font-size: 16px; }
+            .card { padding: 24px; }
+            .dropzone { padding: 40px 20px; }
+            .file-item { flex-direction: column; text-align: center; }
+            .file-icon { margin: 0 0 12px 0; }
+            .file-actions { margin-top: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="card">
+            <h1>Welcome, {{ vendor.vendor_name }}</h1>
+            <p class="subtitle">
+                Upload your portfolio files below. You can add multiple files and we'll combine them for valuation.
+            </p>
+
+            <!-- Upload dropzone -->
+            <div class="dropzone" id="dropzone">
+                <div class="dropzone-icon">📁</div>
+                <div class="dropzone-text">Drop files here or click to browse</div>
+                <div class="dropzone-hint">Excel (.xlsx, .xls) or CSV files • You can upload multiple files</div>
+            </div>
+            <input type="file" id="file-input" accept=".xlsx,.xls,.csv" multiple>
+
+            <!-- Current status -->
+            {% if vendor.status and vendor.status != 'pending' %}
+            <div style="margin-top: 20px;">
+                <span class="status-badge status-{{ vendor.status }}">
+                    {% if vendor.status == 'processing' %}Processing...
+                    {% elif vendor.status == 'complete' %}Valuation Complete
+                    {% elif vendor.status == 'error' %}Needs Attention
+                    {% else %}{{ vendor.status }}{% endif %}
+                </span>
+            </div>
+            {% endif %}
+
+            <div class="privacy-info">
+                <h4>Your data is protected</h4>
+                <ul>
+                    <li>Personal information (emails, phones, addresses) is automatically removed</li>
+                    <li>Client names are anonymized before processing</li>
+                    <li>Your files are processed securely</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- File list -->
+        <div class="card">
+            <h2>Your Files ({{ files|length if files else 0 }})</h2>
+
+            <div class="file-list" id="file-list">
+                {% if files and files|length > 0 %}
+                    {% for file in files %}
+                    <div class="file-item {{ 'warning' if file.status == 'warning' else '' }}" data-file-id="{{ file.id }}">
+                        <div class="file-icon">📊</div>
+                        <div class="file-info">
+                            <div class="file-name">{{ file.original_filename }}</div>
+                            <div class="file-meta">
+                                {{ file.policy_count or 0 }} policies
+                                {% if file.status == 'warning' %} • Has warnings{% endif %}
+                                • Uploaded {{ file.uploaded_at[:10] if file.uploaded_at else 'Recently' }}
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-danger" onclick="deleteFile({{ file.id }}, '{{ file.original_filename }}')">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📂</div>
+                        <p>No files uploaded yet. Drop some files above to get started!</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Revaluate button -->
+            {% if files and files|length > 0 %}
+            <div style="margin-top: 30px; text-align: center;">
+                <button class="btn btn-primary" id="revaluate-btn" onclick="triggerRevaluation()">
+                    Get Portfolio Valuation
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Latest valuation results -->
+        {% if latest_submission and latest_submission.pavtech_status == 'complete' and latest_submission.valuation_summary %}
+        <div class="card">
+            <h2>Latest Valuation</h2>
+            <div class="valuation-box">
+                <div class="valuation-label">Estimated Portfolio Value</div>
+                <div class="valuation-amount" id="valuation-amount">
+                    ${{ '{:,.0f}'.format((latest_submission.valuation_summary|tojson|fromjson).get('estimated_value', 0) if latest_submission.valuation_summary else 0) }}
+                </div>
+                <div class="valuation-note">
+                    Based on {{ files|length if files else 0 }} file(s) • Updated {{ latest_submission.submitted_at[:10] if latest_submission.submitted_at else 'Recently' }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Processing summary (shown after upload) -->
+        <div class="card" id="summary-card" style="display: none;">
+            <h2>Processing Summary</h2>
+            <div class="summary-section" id="summary-content">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <h3>Replace existing file?</h3>
+            <p id="confirm-message">This filename looks similar to an existing file.</p>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="btn-replace">Replace Existing</button>
+                <button class="btn btn-secondary" id="btn-add-new">Add as New File</button>
+                <button class="btn btn-danger" id="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const urlCode = '{{ url_code }}';
+        let pendingFile = null;
+        let pendingMatch = null;
+
+        // Dropzone handling
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+            fileInput.value = ''; // Reset for same file
+        });
+
+        function handleFiles(files) {
+            for (const file of files) {
+                uploadFile(file);
+            }
+        }
+
+        async function uploadFile(file, action = 'auto', replaceFileId = null) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('action', action);
+            if (replaceFileId) {
+                formData.append('replace_file_id', replaceFileId);
+            }
+
+            // Show uploading state
+            addUploadingFile(file.name);
+
+            try {
+                const response = await fetch(`/${urlCode}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.needs_confirmation) {
+                    // Store pending file and show confirmation
+                    pendingFile = file;
+                    pendingMatch = result.match;
+                    showConfirmModal(result.match);
+                    removeUploadingFile(file.name);
+                    return;
+                }
+
+                if (result.success) {
+                    showToast('File uploaded successfully!', 'success');
+                    refreshFileList();
+                    showProcessingSummary(result.processing_summary);
+                } else if (result.error) {
+                    showToast(result.error, 'error');
+                    removeUploadingFile(file.name);
+                }
+
+            } catch (err) {
+                showToast('Upload failed. Please try again.', 'error');
+                removeUploadingFile(file.name);
+            }
+        }
+
+        function addUploadingFile(filename) {
+            const fileList = document.getElementById('file-list');
+            const emptyState = fileList.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            const div = document.createElement('div');
+            div.className = 'file-item uploading';
+            div.id = `uploading-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            div.innerHTML = `
+                <div class="file-icon">&#8987;</div>
+                <div class="file-info">
+                    <div class="file-name">${filename}</div>
+                    <div class="file-meta">Uploading and processing...</div>
+                </div>
+            `;
+            fileList.insertBefore(div, fileList.firstChild);
+        }
+
+        function removeUploadingFile(filename) {
+            const el = document.getElementById(`uploading-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`);
+            if (el) el.remove();
+        }
+
+        async function deleteFile(fileId, filename) {
+            if (!confirm(`Remove "${filename}" from your portfolio?`)) return;
+
+            try {
+                const response = await fetch(`/${urlCode}/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(`Removed ${filename}`, 'success');
+                    refreshFileList();
+                } else {
+                    showToast(result.error || 'Failed to delete', 'error');
+                }
+            } catch (err) {
+                showToast('Delete failed. Please try again.', 'error');
+            }
+        }
+
+        async function triggerRevaluation() {
+            const btn = document.getElementById('revaluate-btn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            try {
+                const response = await fetch(`/${urlCode}/revaluate`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show submission success message - user doesn't need to wait!
+                    showSubmittedState(result.file_count);
+                } else {
+                    showToast(result.error || 'Failed to start processing', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Get Portfolio Valuation';
+                }
+            } catch (err) {
+                showToast('Request failed. Please try again.', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Get Portfolio Valuation';
+            }
+        }
+
+        function showSubmittedState(fileCount) {
+            // Replace the button with a success message
+            const btnContainer = document.getElementById('revaluate-btn').parentElement;
+            btnContainer.innerHTML = `
+                <div style="background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 30px; border-radius: 16px; text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 12px;">✅</div>
+                    <div style="font-size: 1.4rem; font-weight: 600; margin-bottom: 12px;">
+                        Files Submitted Successfully!
+                    </div>
+                    <div style="font-size: 1.1rem; opacity: 0.95; margin-bottom: 16px;">
+                        We're processing ${fileCount} file${fileCount > 1 ? 's' : ''} now.
+                    </div>
+                    <div style="font-size: 1rem; opacity: 0.9; background: rgba(0,0,0,0.15); padding: 16px; border-radius: 10px;">
+                        <strong>You don't need to wait!</strong><br>
+                        We'll email your Deal Manager when the valuation is ready.<br>
+                        Feel free to close this page.
+                    </div>
+                </div>
+            `;
+
+            showToast('Submitted! Check your email soon.', 'success');
+        }
+
+        async function pollStatus() {
+            try {
+                const response = await fetch(`/${urlCode}/status`);
+                const status = await response.json();
+
+                if (status.status === 'processing') {
+                    setTimeout(pollStatus, 3000);
+                } else if (status.status === 'complete') {
+                    showToast('Valuation complete!', 'success');
+                    location.reload();
+                } else if (status.status === 'error') {
+                    showToast('Processing encountered an error', 'error');
+                    location.reload();
+                }
+            } catch (err) {
+                setTimeout(pollStatus, 5000);
+            }
+        }
+
+        async function refreshFileList() {
+            try {
+                const response = await fetch(`/${urlCode}/files`);
+                const data = await response.json();
+
+                const fileList = document.getElementById('file-list');
+                fileList.innerHTML = '';
+
+                if (data.files.length === 0) {
+                    fileList.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">&#128194;</div>
+                            <p>No files uploaded yet. Drop some files above to get started!</p>
+                        </div>
+                    `;
+                    // Hide revaluate button
+                    const btn = document.getElementById('revaluate-btn');
+                    if (btn) btn.style.display = 'none';
+                    return;
+                }
+
+                for (const file of data.files) {
+                    const div = document.createElement('div');
+                    div.className = `file-item ${file.status === 'warning' ? 'warning' : ''}`;
+                    div.dataset.fileId = file.id;
+                    div.innerHTML = `
+                        <div class="file-icon">&#128202;</div>
+                        <div class="file-info">
+                            <div class="file-name">${file.original_filename}</div>
+                            <div class="file-meta">
+                                ${file.policy_count || 0} policies
+                                ${file.status === 'warning' ? ' &#8226; Has warnings' : ''}
+                                &#8226; Uploaded ${file.uploaded_at ? file.uploaded_at.slice(0, 10) : 'Recently'}
+                            </div>
+                        </div>
+                        <div class="file-actions">
+                            <button class="btn btn-danger" onclick="deleteFile(${file.id}, '${file.original_filename.replace(/'/g, "\\'")}')">
+                                Remove
+                            </button>
+                        </div>
+                    `;
+                    fileList.appendChild(div);
+                }
+
+                // Show revaluate button
+                let btn = document.getElementById('revaluate-btn');
+                if (!btn && data.files.length > 0) {
+                    // Create button if it doesn't exist
+                    const container = fileList.parentElement;
+                    const btnDiv = document.createElement('div');
+                    btnDiv.style.marginTop = '30px';
+                    btnDiv.style.textAlign = 'center';
+                    btnDiv.innerHTML = `<button class="btn btn-primary" id="revaluate-btn" onclick="triggerRevaluation()">Get Portfolio Valuation</button>`;
+                    container.appendChild(btnDiv);
+                } else if (btn) {
+                    btn.style.display = data.files.length > 0 ? 'inline-block' : 'none';
+                    btn.disabled = false;
+                    btn.textContent = 'Get Portfolio Valuation';
+                }
+
+            } catch (err) {
+                console.error('Failed to refresh file list:', err);
+            }
+        }
+
+        function showProcessingSummary(items) {
+            if (!items || items.length === 0) return;
+
+            const card = document.getElementById('summary-card');
+            const content = document.getElementById('summary-content');
+
+            content.innerHTML = items.map(item => {
+                let className = 'summary-item';
+                if (item.includes('\u2713') || item.startsWith('Good') || item.startsWith('Found')) className += ' positive';
+                else if (item.includes('\u26a0') || item.includes('warning')) className += ' warning';
+                else if (item.includes('\u2139') || item.includes('\ud83d\udd12')) className += ' info';
+                return `<div class="${className}">${item}</div>`;
+            }).join('');
+
+            card.style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function showConfirmModal(match) {
+            const modal = document.getElementById('confirm-modal');
+            const message = document.getElementById('confirm-message');
+            message.textContent = match.message;
+            modal.classList.add('active');
+        }
+
+        function hideConfirmModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+            pendingFile = null;
+            pendingMatch = null;
+        }
+
+        // Modal button handlers
+        document.getElementById('btn-replace').addEventListener('click', async () => {
+            if (pendingFile && pendingMatch) {
+                // Find the file ID to replace
+                const response = await fetch(`/${urlCode}/files`);
+                const data = await response.json();
+                const existingFile = data.files.find(f => f.original_filename === pendingMatch.filename);
+
+                hideConfirmModal();
+                if (existingFile) {
+                    uploadFile(pendingFile, 'replace', existingFile.id);
+                } else {
+                    uploadFile(pendingFile, 'add_new');
+                }
+            }
+        });
+
+        document.getElementById('btn-add-new').addEventListener('click', () => {
+            if (pendingFile) {
+                hideConfirmModal();
+                uploadFile(pendingFile, 'add_new');
+            }
+        });
+
+        document.getElementById('btn-cancel').addEventListener('click', hideConfirmModal);
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        // Auto-poll if processing
+        {% if vendor.status == 'processing' %}
+        pollStatus();
+        {% endif %}
+    </script>
+</body>
+</html>

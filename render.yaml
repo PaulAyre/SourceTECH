@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: sourcetech
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 2
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: PAVTECH_API_URL
+        value: https://pavtech.onrender.com
+      - key: DATABASE
+        value: /data/sourcetech.db
+      - key: TEMP_DIR
+        value: /data/temp
+      - key: FROM_EMAIL
+        value: sourcetech@example.com
+      - key: ADMIN_PASSWORD
+        sync: false
+    disk:
+      name: sourcetech-data
+      mountPath: /data
+      sizeGB: 1

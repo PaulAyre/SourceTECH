@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Already Submitted - SourceTECH{% endblock %}
+
+{% block content %}
+<div class="text-center" style="max-width: 500px; margin: 0 auto; padding-top: 4rem;">
+    <div class="mb-4">
+        <i class="bi bi-check-circle-fill" style="font-size: 5rem; color: #198754;"></i>
+    </div>
+
+    <h2>Portfolio Already Submitted</h2>
+
+    <p class="lead">
+        {{ vendor.vendor_name }}'s portfolio has already been submitted and processed.
+    </p>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <p class="mb-2"><strong>Submitted:</strong> {{ vendor.last_submission_at }}</p>
+            <p class="mb-0"><strong>Status:</strong>
+                <span class="badge bg-success">Complete</span>
+            </p>
+        </div>
+    </div>
+
+    <p class="mt-4 text-muted">
+        If you need to submit an updated portfolio, please contact your account manager
+        to request a new upload link.
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git -C \"C:/Programming/SourceTECH\" config user.name \"Paul\")",
+      "Bash(git -C \"C:/Programming/SourceTECH\" config user.email \"impaulayre@gmail.com\")",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" config user.name \"Paul\")",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" config user.email \"impaulayre@gmail.com\")",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" status)",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" log --oneline -5)",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" add -A)"
+    ]
+  }
+}
