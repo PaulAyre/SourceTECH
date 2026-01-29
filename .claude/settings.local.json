@@ -10,7 +10,15 @@
       "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" config user.email \"impaulayre@gmail.com\")",
       "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" status)",
       "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" log --oneline -5)",
-      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" add -A)"
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" add -A)",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" commit -m \"$\\(cat <<''EOF''\nInitial commit: SourceTECH vendor portfolio upload portal\n\nComplete Flask application with PII stripping, PavTECH integration,\nadmin portal, and SendGrid email notifications.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:pavtech.com.au)",
+      "WebSearch",
+      "WebFetch(domain:www.pavtech.io)",
+      "WebFetch(domain:pavtech.com)",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" diff --stat)",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" ls-files:*)",
+      "Bash(git --git-dir=\"C:/Programming/SourceTECH/.git\" --work-tree=\"C:/Programming/SourceTECH\" commit -m \"$\\(cat <<''EOF''\nv2.0: Complete UI redesign with PavTECH styling and insurer sidebar\n\n- Full CSS design system based on PavTECH brand \\(green gradients, cream sidebar, modern cards\\)\n- Upload page with left sidebar containing 9 Australian insurer download guides\n- Each insurer has: step-by-step instructions, portal link, format info, adviser code notes\n- Smart drag-and-drop with client-side duplicate filename detection\n- Handles Chrome download suffixes: \\(1\\), \\(2\\), _1, _2, \"copy\" variants\n- Sequential file processing queue with per-file duplicate confirmation\n- Mobile-responsive sidebar \\(drawer on mobile, sticky on desktop\\)\n- InsurancePLUS logo integration in header and favicon\n- Admin templates updated with new nav styling and gradient stat cards\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

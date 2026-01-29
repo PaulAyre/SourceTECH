@@ -19,6 +19,7 @@
 | `pavtech_client.py` | PavTECH API integration (batch upload/process) |
 | `excel_parser.py` | Master document extraction (valuation summary) |
 | `email_service.py` | SendGrid email notifications |
+| `static/css/style.css` | Complete design system v2.0 (PavTECH-inspired) |
 
 ## Architecture Flow
 ```
@@ -26,12 +27,31 @@ Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> 
 ```
 
 ## Current Status
-- Initial codebase - just initialized git repository
-- No previous commits or branches
+- v2.0 UI redesign complete
+- Git initialized, initial commit on master
+
+## Version History
+- **v2.0** - Full UI redesign with PavTECH styling, insurer sidebar, smart drag-and-drop
+- **v1.0** - Initial codebase (commit 3c6768a)
 
 ## What We're Working On
-- [ ] Getting up to speed on codebase (DONE)
-- [ ] Initial git setup and commit
+- [x] Getting up to speed on codebase
+- [x] Initial git setup and commit
+- [x] v2.0 UI redesign (PavTECH style, insurer sidebar, smart upload)
 
 ## Completed Work
 - Initial project exploration and documentation
+- Git repo initialized (commit 3c6768a on master)
+- **v2.0 UI Redesign:**
+  - Complete CSS design system based on PavTECH brand (green gradients, cream sidebar, modern cards)
+  - Upload page with left sidebar containing 9 Australian insurer download guides
+  - Each insurer has: step-by-step instructions, portal link, format info, adviser code notes
+  - Smart drag-and-drop with client-side duplicate filename detection
+  - Handles Chrome download suffixes: (1), (2), _1, _2, "copy" variants
+  - Sequential file processing queue with per-file duplicate confirmation
+  - Mobile-responsive sidebar (drawer on mobile, sticky on desktop)
+  - InsurancePLUS logo integration in header
+  - Admin templates updated with new nav styling and gradient stat cards
+
+## Stable Commits
+- `3c6768a` - Initial commit (v1.0 baseline)

@@ -7,35 +7,27 @@
 
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card text-white bg-primary">
-            <div class="card-body">
-                <h3 class="card-title">{{ stats.total_vendors }}</h3>
-                <p class="card-text mb-0">Total Vendors</p>
-            </div>
+        <div class="st-stat-card st-stat-green">
+            <h3>{{ stats.total_vendors }}</h3>
+            <p>Total Vendors</p>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-white bg-warning">
-            <div class="card-body">
-                <h3 class="card-title">{{ stats.pending_vendors }}</h3>
-                <p class="card-text mb-0">Pending</p>
-            </div>
+        <div class="st-stat-card st-stat-amber">
+            <h3>{{ stats.pending_vendors }}</h3>
+            <p>Pending</p>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-white bg-info">
-            <div class="card-body">
-                <h3 class="card-title">{{ stats.processing_vendors }}</h3>
-                <p class="card-text mb-0">Processing</p>
-            </div>
+        <div class="st-stat-card st-stat-blue">
+            <h3>{{ stats.processing_vendors }}</h3>
+            <p>Processing</p>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-white bg-success">
-            <div class="card-body">
-                <h3 class="card-title">{{ stats.complete_vendors }}</h3>
-                <p class="card-text mb-0">Complete</p>
-            </div>
+        <div class="st-stat-card st-stat-teal">
+            <h3>{{ stats.complete_vendors }}</h3>
+            <p>Complete</p>
         </div>
     </div>
 </div>
