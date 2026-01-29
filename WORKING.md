@@ -27,8 +27,8 @@ Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> 
 ```
 
 ## Current Status
-- v2.0 UI redesign complete
-- Git initialized, initial commit on master
+- v2.0 UI redesign complete and committed
+- Git initialized, v2.0 committed on master
 
 ## Version History
 - **v2.0** - Full UI redesign with PavTECH styling, insurer sidebar, smart drag-and-drop
@@ -54,4 +54,5 @@ Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> 
   - Admin templates updated with new nav styling and gradient stat cards
 
 ## Stable Commits
+- `491aec1` - v2.0 UI redesign (PavTECH styling, insurer sidebar, smart upload)
 - `3c6768a` - Initial commit (v1.0 baseline)
