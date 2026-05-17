@@ -28,14 +28,16 @@ logger = logging.getLogger(__name__)
 
 # Config
 PAVTECH_API_URL = os.environ.get('PAVTECH_API_URL', 'http://localhost:5000')
-DATABASE = os.environ.get('DATABASE', 'sourcetech.db')
-TEMP_DIR = os.environ.get('TEMP_DIR', '/tmp/sourcetech')
 UPLOADS_DIR = os.environ.get('UPLOADS_DIR', 'uploads')  # Persistent file storage
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')  # Change in production!
 
 # Ensure directories exist
-Path(TEMP_DIR).mkdir(parents=True, exist_ok=True)
 Path(UPLOADS_DIR).mkdir(parents=True, exist_ok=True)
+
+# Database lives inside uploads dir for persistence (both local and Render)
+DATABASE = os.environ.get('DATABASE', str(Path(UPLOADS_DIR) / 'sourcetech.db'))
+TEMP_DIR = os.environ.get('TEMP_DIR', str(Path(UPLOADS_DIR) / 'temp'))
+Path(TEMP_DIR).mkdir(parents=True, exist_ok=True)
 
 pavtech = PavTechClient(PAVTECH_API_URL, temp_dir=TEMP_DIR)
 
@@ -493,6 +495,18 @@ def handle_upload(url_code):
 
     # Validate file
     validation = validate_portfolio_file(file_path)
+
+    # Short-circuit on validation failure — strip_pii would crash on corrupt
+    # or non-Excel files and return 500. Return the friendly validation
+    # message instead so the vendor sees what's wrong.
+    if not validation.get('valid'):
+        return jsonify({
+            'success': False,
+            'valid': False,
+            'errors': validation.get('errors', ['File could not be processed']),
+            'warnings': validation.get('warnings', []),
+            'filename': file.filename,
+        }), 400
 
     # Strip PII
     cleaned_df, pii_report = strip_pii(file_path)
