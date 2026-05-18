@@ -29,7 +29,19 @@ logger = logging.getLogger(__name__)
 # Config
 PAVTECH_API_URL = os.environ.get('PAVTECH_API_URL', 'http://localhost:5000')
 UPLOADS_DIR = os.environ.get('UPLOADS_DIR', 'uploads')  # Persistent file storage
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')  # Change in production!
+# ADMIN_PASSWORD must come from the environment. No default — running with
+# a known default would let anyone with internet access into the admin panel
+# (every vendor portal upload would be enumerable + deletable). If unset we
+# log a loud warning and fall back to a per-process random token, which means
+# admin login becomes unreachable until ADMIN_PASSWORD is set (preferable to
+# `changeme`).
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+if not ADMIN_PASSWORD:
+    ADMIN_PASSWORD = secrets.token_urlsafe(32)
+    logging.getLogger(__name__).error(
+        "ADMIN_PASSWORD is not set. Generated a random one for this process — "
+        "admin login will be effectively unreachable until ADMIN_PASSWORD is set."
+    )
 
 # Ensure directories exist
 Path(UPLOADS_DIR).mkdir(parents=True, exist_ok=True)
@@ -128,14 +140,80 @@ def admin_required(f):
     return decorated_function
 
 
+# Per-IP failed-login tracker. {ip: {'failures': int, 'lockout_until': datetime|None}}
+# In-memory only; resets on process restart and is per-gunicorn-worker. For a
+# stronger guarantee we should move this to Redis (see TODO in
+# /Users/paulayre/concierge/sourcetech/admin-throttle-design-2026-05-18.md).
+import hmac as _hmac
+from collections import defaultdict
+from datetime import timedelta as _timedelta
+
+_ADMIN_LOGIN_MAX_FAILS = int(os.environ.get('ADMIN_LOGIN_MAX_FAILS', '5'))
+_ADMIN_LOGIN_WINDOW_MIN = int(os.environ.get('ADMIN_LOGIN_WINDOW_MIN', '15'))
+_ADMIN_LOGIN_LOCKOUT_MIN = int(os.environ.get('ADMIN_LOGIN_LOCKOUT_MIN', '15'))
+_admin_login_failures = defaultdict(lambda: {'failures': 0, 'first_failure_at': None, 'lockout_until': None})
+
+
+def _admin_client_ip():
+    """Best-effort client IP. Render sits behind a proxy so trust X-Forwarded-For first."""
+    xff = request.headers.get('X-Forwarded-For', '')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
+
+def _admin_is_locked_out(ip):
+    rec = _admin_login_failures[ip]
+    if rec['lockout_until'] and datetime.now() < rec['lockout_until']:
+        return True, rec['lockout_until']
+    return False, None
+
+
+def _admin_record_failure(ip):
+    rec = _admin_login_failures[ip]
+    now = datetime.now()
+    # Reset the failure window if the first failure is older than the window.
+    if rec['first_failure_at'] and (now - rec['first_failure_at']) > _timedelta(minutes=_ADMIN_LOGIN_WINDOW_MIN):
+        rec['failures'] = 0
+        rec['first_failure_at'] = None
+    if rec['first_failure_at'] is None:
+        rec['first_failure_at'] = now
+    rec['failures'] += 1
+    if rec['failures'] >= _ADMIN_LOGIN_MAX_FAILS:
+        rec['lockout_until'] = now + _timedelta(minutes=_ADMIN_LOGIN_LOCKOUT_MIN)
+        logger.warning(
+            "Admin login lockout: ip=%s failures=%s locked_until=%s",
+            ip, rec['failures'], rec['lockout_until'].isoformat(),
+        )
+    else:
+        logger.info("Admin login failure: ip=%s failures=%s", ip, rec['failures'])
+
+
+def _admin_clear_failures(ip):
+    _admin_login_failures[ip] = {'failures': 0, 'first_failure_at': None, 'lockout_until': None}
+
+
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
-    """Admin login page."""
+    """Admin login page with per-IP failed-login throttling."""
     error = None
+    ip = _admin_client_ip()
+    locked, until = _admin_is_locked_out(ip)
+    if locked:
+        wait_s = int((until - datetime.now()).total_seconds())
+        error = f'Too many failed attempts. Try again in {max(wait_s, 1)} seconds.'
+        logger.warning("Admin login attempt while locked out: ip=%s", ip)
+        return render_template('admin/login.html', error=error), 429
+
     if request.method == 'POST':
-        if request.form.get('password') == ADMIN_PASSWORD:
+        submitted = request.form.get('password', '')
+        # Constant-time comparison — protects against timing side-channels.
+        if _hmac.compare_digest(submitted, ADMIN_PASSWORD):
+            _admin_clear_failures(ip)
             session['admin_logged_in'] = True
+            logger.info("Admin login success: ip=%s", ip)
             return redirect(url_for('admin_dashboard'))
+        _admin_record_failure(ip)
         error = 'Invalid password'
     return render_template('admin/login.html', error=error)
 
