@@ -37,3 +37,7 @@ uploads/
 
 # Claude temp files
 tmpclaude-*
+
+# Windows accidental output (nul is Windows /dev/null equivalent)
+nul
+NUL
