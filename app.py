@@ -4,6 +4,7 @@ Main Flask application
 """
 from flask import Flask, request, render_template, redirect, url_for, jsonify, session
 from functools import wraps
+from werkzeug.utils import secure_filename
 from validator import validate_portfolio_file
 from pii_stripper import strip_pii
 from pavtech_client import PavTechClient
@@ -486,10 +487,21 @@ def handle_upload(url_code):
             }
         })
 
-    # Save file to vendor's upload directory
+    # Save file to vendor's upload directory.
+    # Sanitize the uploaded filename before joining it to a Path — werkzeug's
+    # secure_filename strips path-traversal sequences (../), NULs, shell chars,
+    # and non-ASCII characters that could collide on case-insensitive filesystems.
+    # We keep the unsanitised name in `file.filename` for display + DB
+    # original_filename (it never touches disk), and use the sanitised version
+    # for everything that hits the filesystem.
+    sanitised_name = secure_filename(file.filename) or f"upload{file_ext}"
+    # secure_filename can drop the extension on pathological inputs (e.g. all
+    # non-ASCII); re-attach it if missing so downstream extension checks hold.
+    if not sanitised_name.lower().endswith(file_ext):
+        sanitised_name = f"{sanitised_name}{file_ext}"
     vendor_dir = get_vendor_upload_dir(url_code)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    safe_filename = f"{timestamp}_{file.filename}"
+    safe_filename = f"{timestamp}_{sanitised_name}"
     file_path = vendor_dir / safe_filename
     file.save(file_path)
 
