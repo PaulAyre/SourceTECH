@@ -1,45 +1,54 @@
 # SourceTECH - Working Log
 
 ## Project Overview
+
 **Vendor Portfolio Upload Portal** - A Flask web app that enables insurance vendors to upload portfolio files via unique URLs. Files are validated, PII-stripped, processed through PavTECH for valuation, and results emailed to account managers via SendGrid.
 
 ## Tech Stack
+
 - **Backend:** Python/Flask 3.0.0, SQLite3, Gunicorn
 - **Data Processing:** Pandas, OpenPyXL
 - **External Services:** PavTECH API (valuation engine), SendGrid (email)
-- **Frontend:** Flask templates, Bootstrap, vanilla JS, drag-and-drop upload
+- **Frontend:** Flask templates, vanilla JS, drag-and-drop upload, CSS design system v2.0
 - **Deployment:** Render.com
 
 ## Key Files
-| File | Purpose |
-|------|---------|
-| `app.py` | Main Flask app (831 lines) - all routes & logic |
-| `validator.py` | Portfolio file validation (required fields check) |
-| `pii_stripper.py` | PII removal (emails, phones, addresses, names) |
-| `pavtech_client.py` | PavTECH API integration (batch upload/process) |
-| `excel_parser.py` | Master document extraction (valuation summary) |
-| `email_service.py` | SendGrid email notifications |
-| `static/css/style.css` | Complete design system v2.0 (PavTECH-inspired) |
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `app.py` | Main Flask app - all routes & logic | 831 |
+| `email_service.py` | SendGrid email notifications with attachments | 346 |
+| `pavtech_client.py` | PavTECH batch API client (upload, process, poll, download) | 317 |
+| `validator.py` | Portfolio file validation with graceful assumptions | 213 |
+| `excel_parser.py` | Master document extraction (valuation summary) | 197 |
+| `pii_stripper.py` | PII removal (column deletion, name anonymization, regex scan) | 153 |
+| `static/css/style.css` | Complete design system v2.0 (PavTECH-inspired) | - |
 
 ## Architecture Flow
+
 ```
-Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> Email to DM
+Vendor Upload -> Validation -> PII Strip -> PavTECH Batch Processing -> Master Doc -> Email to DM
 ```
 
 ## Current Status
+
 - v2.0 UI redesign complete and committed
 - Git initialized, v2.0 committed on master
+- No remote configured (local repo only)
 
 ## Version History
+
 - **v2.0** - Full UI redesign with PavTECH styling, insurer sidebar, smart drag-and-drop
 - **v1.0** - Initial codebase (commit 3c6768a)
 
 ## What We're Working On
+
 - [x] Getting up to speed on codebase
 - [x] Initial git setup and commit
 - [x] v2.0 UI redesign (PavTECH style, insurer sidebar, smart upload)
 
 ## Completed Work
+
 - Initial project exploration and documentation
 - Git repo initialized (commit 3c6768a on master)
 - **v2.0 UI Redesign:**
@@ -54,5 +63,7 @@ Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> 
   - Admin templates updated with new nav styling and gradient stat cards
 
 ## Stable Commits
+
+- `cdc7da8` - Update WORKING.md with v2.0 stable commit reference
 - `491aec1` - v2.0 UI redesign (PavTECH styling, insurer sidebar, smart upload)
 - `3c6768a` - Initial commit (v1.0 baseline)

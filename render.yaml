@@ -12,10 +12,8 @@ services:
         sync: false
       - key: PAVTECH_API_URL
         value: https://pavtech.onrender.com
-      - key: DATABASE
-        value: /data/sourcetech.db
-      - key: TEMP_DIR
-        value: /data/temp
+      - key: UPLOADS_DIR
+        value: /data
       - key: FROM_EMAIL
         value: sourcetech@example.com
       - key: ADMIN_PASSWORD
