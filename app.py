@@ -23,6 +23,14 @@ import shutil
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# Cap upload size — Flask short-circuits with 413 RequestEntityTooLarge BEFORE
+# the file hits disk, which both prevents disk-fill DOS and saves work in
+# strip_pii / pandas on absurd files. Default 100 MiB covers the largest
+# real vendor portfolio (~30 MB observed) with comfortable headroom; override
+# via MAX_UPLOAD_MB env var on Render if a genuinely huge book lands.
+_max_upload_mb = int(os.environ.get('MAX_UPLOAD_MB', '100'))
+app.config['MAX_CONTENT_LENGTH'] = _max_upload_mb * 1024 * 1024
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -839,6 +847,16 @@ def health():
         'pavtech_available': pavtech_ok,
         'timestamp': datetime.now().isoformat()
     })
+
+
+@app.errorhandler(413)
+def _request_entity_too_large(_e):
+    """Return JSON for the AJAX upload route, HTML otherwise."""
+    mb = app.config.get('MAX_CONTENT_LENGTH', 0) // (1024 * 1024)
+    msg = f"File too large. Maximum upload size is {mb} MB."
+    if request.path.endswith('/upload') or request.is_json or 'application/json' in request.headers.get('Accept', ''):
+        return jsonify({'success': False, 'valid': False, 'error': msg, 'errors': [msg]}), 413
+    return render_template('error.html', message=msg), 413
 
 
 if __name__ == '__main__':
