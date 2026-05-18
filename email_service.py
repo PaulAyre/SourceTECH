@@ -25,25 +25,102 @@ except ImportError:
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'sourcetech@example.com')
 
-# Fixed DM contact list
-DM_CONTACTS = {
-    'paul': {
-        'name': 'Paul Ayre',
-        'email': 'impaulayre@gmail.com'
-    },
-    'thomas': {
-        'name': 'Thomas Hawke',
-        'email': 'thomas@insuranceplus.com.au'
-    },
-    'mike': {
-        'name': 'Mike Clifford',
-        'email': 'mike@insuranceplus.com.au'
-    }
+# DM contact list — externalised in INS-62.
+#
+# Resolution order (first hit wins):
+#   1. Per-DM env var: DM_<KEY>_EMAIL and DM_<KEY>_NAME
+#      e.g. DM_PAUL_EMAIL=paul@insuranceplus.com.au DM_PAUL_NAME="Paul Ayre"
+#   2. JSON blob env var: DM_CONTACTS_JSON='{"paul": {"name": "...", "email": "..."}}'
+#   3. Built-in fallback (intentionally NOT impaulayre@gmail.com — that was a
+#      personal address leaked into production code; default the fallback to
+#      InsurancePLUS-domain only).
+#
+# Vendor admin form (long-term plan): when a vendor is created in /admin/vendors/create
+# the DM dropdown should write into a `dm_contacts` SQLite table that overrides
+# everything below. Scaffolded in INS-62 follow-up.
+import json as _json
+
+_BUILT_IN_DMS = {
+    'paul':   {'name': 'Paul Ayre',     'email': 'paul@insuranceplus.com.au'},
+    'thomas': {'name': 'Thomas Hawke',  'email': 'thomas@insuranceplus.com.au'},
+    'mike':   {'name': 'Mike Clifford', 'email': 'mike@insuranceplus.com.au'},
 }
 
+
+def _load_dm_contacts() -> Dict:
+    """Build the DM map from env, falling back to built-ins."""
+    contacts = {k: dict(v) for k, v in _BUILT_IN_DMS.items()}
+
+    # Layer 2: JSON blob env var overrides built-ins.
+    raw = os.environ.get('DM_CONTACTS_JSON')
+    if raw:
+        try:
+            parsed = _json.loads(raw)
+            if isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    if isinstance(v, dict) and 'email' in v:
+                        contacts[k.lower()] = {
+                            'name': v.get('name', k.title()),
+                            'email': v['email'],
+                        }
+        except _json.JSONDecodeError as exc:
+            logger.error("DM_CONTACTS_JSON parse error: %s — falling back to built-ins", exc)
+
+    # Layer 1: per-DM env vars override everything else.
+    for key in list(contacts.keys()) + ['paul', 'thomas', 'mike']:
+        env_email = os.environ.get(f"DM_{key.upper()}_EMAIL")
+        env_name = os.environ.get(f"DM_{key.upper()}_NAME")
+        if env_email:
+            contacts.setdefault(key.lower(), {'name': key.title(), 'email': env_email})
+            contacts[key.lower()]['email'] = env_email
+            if env_name:
+                contacts[key.lower()]['name'] = env_name
+
+    return contacts
+
+
+DM_CONTACTS = _load_dm_contacts()
+
+
+def _normalise_dm_key(dm_key: str) -> str:
+    """Normalise a DM lookup key — strip whitespace, lowercase, drop punctuation."""
+    return ''.join(ch for ch in dm_key.lower().strip() if ch.isalnum())
+
+
 def get_dm_contact(dm_key: str) -> Dict:
-    """Get DM contact info by key or return default."""
-    return DM_CONTACTS.get(dm_key.lower(), DM_CONTACTS['paul'])
+    """
+    Get DM contact info by key.
+
+    Resolution:
+      1. Exact (case-insensitive) match on _normalise_dm_key.
+      2. Typo-tolerant fallback — closest match by SequenceMatcher ratio
+         if it scores >= 0.75. This catches "paull", "tomas", "mik", etc.
+      3. Built-in default (paul) — logged at WARN so we can spot pattern
+         drift over time.
+    """
+    if not dm_key:
+        logger.warning("get_dm_contact called with empty key, defaulting to 'paul'")
+        return DM_CONTACTS['paul']
+
+    norm = _normalise_dm_key(dm_key)
+    if norm in DM_CONTACTS:
+        return DM_CONTACTS[norm]
+
+    # Typo-tolerant
+    import difflib as _difflib
+    best = None
+    best_score = 0.0
+    for k in DM_CONTACTS:
+        score = _difflib.SequenceMatcher(None, norm, k).ratio()
+        if score > best_score:
+            best, best_score = k, score
+    if best and best_score >= 0.75:
+        logger.info("DM key %r matched %r via typo-tolerant lookup (score=%.2f)",
+                    dm_key, best, best_score)
+        return DM_CONTACTS[best]
+
+    logger.warning("DM key %r did not match any contact, defaulting to 'paul'", dm_key)
+    return DM_CONTACTS['paul']
 
 
 def format_currency(amount: float) -> str:
