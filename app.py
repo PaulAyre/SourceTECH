@@ -103,6 +103,17 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_vendors_url_code ON vendors(url_code);
         CREATE INDEX IF NOT EXISTS idx_submissions_vendor_id ON submissions(vendor_id);
         CREATE INDEX IF NOT EXISTS idx_vendor_files_vendor_id ON vendor_files(vendor_id);
+
+        -- INS-62 follow-up: DB-backed DM contact override (admin-editable
+        -- via /admin/dm_contacts route — not wired yet but the column is
+        -- here so we don't need a migration when the route lands).
+        CREATE TABLE IF NOT EXISTS dm_contacts (
+            dm_key TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        );
     ''')
     db.commit()
     db.close()
@@ -112,6 +123,30 @@ def init_db():
 # Initialize database on startup
 with app.app_context():
     init_db()
+
+# INS-62 follow-up: register a DB-backed DM contact lookup. email_service
+# consults it FIRST in get_dm_contact, before env / built-in. Returns None
+# for misses so the env+built-in chain still applies.
+def _dm_db_lookup(dm_key: str):
+    try:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT name, email FROM dm_contacts WHERE dm_key = ?",
+            (dm_key,),
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except sqlite3.Error:
+        # Don't crash email pipeline over a DB hiccup.
+        logger.exception('dm_contacts lookup failed')
+        return None
+
+try:
+    from email_service import register_dm_db_lookup
+    register_dm_db_lookup(_dm_db_lookup)
+except ImportError:
+    logger.warning('email_service has no register_dm_db_lookup — pre-INS-62 build?')
 
 
 # ─────────────────────────────────────────────────────────────

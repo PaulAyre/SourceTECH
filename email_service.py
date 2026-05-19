@@ -87,14 +87,35 @@ def _normalise_dm_key(dm_key: str) -> str:
     return ''.join(ch for ch in dm_key.lower().strip() if ch.isalnum())
 
 
+# INS-62 follow-up: optional DB-backed override layer.
+# If app.py registers a callable here via register_dm_db_lookup, that callable
+# is consulted FIRST for every get_dm_contact call. Empty / missing rows fall
+# through to env + built-ins.
+#
+# Expected callable signature:
+#     fn(dm_key: str) -> Optional[Dict[str, str]]
+#     returning {'name': str, 'email': str} for a hit, None for a miss.
+_dm_db_lookup: Optional[callable] = None  # type: ignore[assignment]
+
+
+def register_dm_db_lookup(fn) -> None:
+    """Install a DB-backed lookup function. app.py calls this at startup."""
+    global _dm_db_lookup
+    _dm_db_lookup = fn
+    logger.info("DM DB-backed lookup registered (callable=%s)", getattr(fn, '__name__', fn))
+
+
 def get_dm_contact(dm_key: str) -> Dict:
     """
     Get DM contact info by key.
 
-    Resolution:
-      1. Exact (case-insensitive) match on _normalise_dm_key.
+    Resolution (first hit wins):
+      0. DB-backed override (INS-62 follow-up). Admin-edited dm_contacts table
+         in the SQLite DB. None means "no DB override" — fall through.
+      1. Exact (case-insensitive) match on _normalise_dm_key against the
+         env-driven DM_CONTACTS map.
       2. Typo-tolerant fallback — closest match by SequenceMatcher ratio
-         if it scores >= 0.75. This catches "paull", "tomas", "mik", etc.
+         if it scores >= 0.75. Catches "paull", "tomas", "mik", etc.
       3. Built-in default (paul) — logged at WARN so we can spot pattern
          drift over time.
     """
@@ -103,6 +124,18 @@ def get_dm_contact(dm_key: str) -> Dict:
         return DM_CONTACTS['paul']
 
     norm = _normalise_dm_key(dm_key)
+
+    # Layer 0: DB-backed override.
+    if _dm_db_lookup is not None:
+        try:
+            row = _dm_db_lookup(norm)
+            if row and row.get('email'):
+                logger.info("DM key %r matched DB-backed override", dm_key)
+                return {'name': row.get('name', norm.title()), 'email': row['email']}
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("DM DB lookup failed for key=%r (%s) — falling back to env/built-in",
+                           dm_key, exc)
+
     if norm in DM_CONTACTS:
         return DM_CONTACTS[norm]
 
