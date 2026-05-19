@@ -1,14 +1,15 @@
 """
-SourceTECH persisted batch queue — SCAFFOLD ONLY (INS-60).
+SourceTECH persisted batch queue (INS-60).
 
 Design doc:
   /Users/paulayre/concierge/sourcetech/batch-recovery-design-2026-05-18.md
 
-This module is intentionally NOT wired into app.py yet. The cutover plan
-is documented in the design doc — a second PR will replace
-`threading.Thread(target=_process_batch_with_pavtech, ...)` in
-trigger_revaluation() with `enqueue_batch(...)` and call
-`start_worker()` at app startup.
+WIRED in app.py on branch paul/ins-60-batch-recovery-cutover:
+  - init_queue + start_worker called at startup.
+  - trigger_revaluation() uses enqueue_batch instead of fire-and-forget
+    threading.Thread (with a fallback to the thread path if
+    SOURCETECH_USE_BATCH_QUEUE=0 or enqueue raises).
+  - /admin/queue route exposes worker_alive + list_pending + stuck_jobs.
 
 Public API:
     init_queue(db_path)            -- ensure batch_jobs table exists
@@ -262,6 +263,13 @@ def start_worker(db_path: str, processor_fn: Callable) -> None:
         name="sourcetech-batch-queue",
     )
     _worker_thread.start()
+
+
+def worker_alive() -> bool:
+    """Returns True if the worker thread is currently running.
+    Used by /admin/queue diagnostics to alert if the worker has died.
+    """
+    return _worker_thread is not None and _worker_thread.is_alive()
 
 
 def stop_worker() -> None:

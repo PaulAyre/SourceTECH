@@ -9,6 +9,7 @@ from pii_stripper import strip_pii
 from pavtech_client import PavTechClient
 from excel_parser import extract_valuation_summary
 from email_service import send_dm_notification
+import batch_queue
 import sqlite3
 import secrets
 import os
@@ -103,6 +104,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_vendors_url_code ON vendors(url_code);
         CREATE INDEX IF NOT EXISTS idx_submissions_vendor_id ON submissions(vendor_id);
         CREATE INDEX IF NOT EXISTS idx_vendor_files_vendor_id ON vendor_files(vendor_id);
+        -- INS-60: idempotency guard on PavTECH batch IDs. UNIQUE allows NULLs in SQLite
+        -- so the existing pre-cutover rows that have batch_id=NULL stay valid.
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_submissions_pavtech_batch_id ON submissions(pavtech_batch_id) WHERE pavtech_batch_id IS NOT NULL;
     ''')
     db.commit()
     db.close()
@@ -112,6 +116,23 @@ def init_db():
 # Initialize database on startup
 with app.app_context():
     init_db()
+
+# INS-60: persisted batch queue + recovery worker.
+# Wire the queue here, after init_db() so the batch_jobs table can be created.
+# The worker is a single daemon thread that drains pending jobs and reclaims
+# stuck in_progress rows from a prior process — THE recovery feature.
+# Disable via SOURCETECH_DISABLE_BATCH_QUEUE=1 (useful for tests / one-off scripts).
+if not os.environ.get('SOURCETECH_DISABLE_BATCH_QUEUE'):
+    try:
+        batch_queue.init_queue(DATABASE)
+        batch_queue.start_worker(DATABASE, lambda v, fp, fi: _process_batch_with_pavtech(v, fp, fi))
+        logger.info('Batch queue worker started (db=%s)', DATABASE)
+    except Exception:
+        # Never fail app startup over the queue — log and continue. The legacy
+        # thread fallback in trigger_revaluation is still safe to use if
+        # SOURCETECH_USE_BATCH_QUEUE=0.
+        logger.exception('Failed to start batch_queue worker — falling back to inline threads')
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -176,6 +197,27 @@ def admin_dashboard():
 
     db.close()
     return render_template('admin/dashboard.html', stats=stats, recent_submissions=recent_submissions)
+
+
+@app.route('/admin/queue')
+@admin_required
+def admin_queue():
+    """INS-60 diagnostics: list pending + in_progress + recently-stuck batch jobs.
+    Returns JSON for now (no template needed) — Paul can pretty-print in the
+    browser. The data lives in the SQLite batch_jobs table created by
+    batch_queue.init_queue(DATABASE).
+    """
+    try:
+        pending = batch_queue.list_pending(DATABASE)
+        stuck = batch_queue.stuck_jobs(DATABASE)
+        return jsonify({
+            'pending_or_in_progress': pending,
+            'stuck_in_progress': stuck,
+            'worker_alive': batch_queue.worker_alive(),
+        })
+    except Exception as exc:
+        logger.exception('admin_queue failed')
+        return jsonify({'error': str(exc)}), 500
 
 
 @app.route('/admin/vendors')
@@ -650,13 +692,29 @@ def trigger_revaluation(url_code):
     files_list = [dict(f) for f in files]
     db.close()
 
-    # Start background processing
-    thread = threading.Thread(
-        target=_process_batch_with_pavtech,
-        args=(vendor_dict, file_paths, files_list),
-        daemon=True
-    )
-    thread.start()
+    # Start background processing.
+    # INS-60: prefer the persisted batch queue (durable across restarts) but
+    # keep the legacy fire-and-forget thread as an emergency fallback path.
+    use_queue = os.environ.get('SOURCETECH_USE_BATCH_QUEUE', '1') == '1'
+    if use_queue and not os.environ.get('SOURCETECH_DISABLE_BATCH_QUEUE'):
+        try:
+            job_id = batch_queue.enqueue_batch(
+                DATABASE, vendor_dict, file_paths, files_list
+            )
+            logger.info('Enqueued batch job %s for vendor=%s', job_id, vendor_dict.get('vendor_name'))
+        except Exception:
+            logger.exception('enqueue_batch failed — falling back to inline thread')
+            threading.Thread(
+                target=_process_batch_with_pavtech,
+                args=(vendor_dict, file_paths, files_list),
+                daemon=True,
+            ).start()
+    else:
+        threading.Thread(
+            target=_process_batch_with_pavtech,
+            args=(vendor_dict, file_paths, files_list),
+            daemon=True,
+        ).start()
 
     return jsonify({
         'success': True,
