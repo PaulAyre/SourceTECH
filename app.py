@@ -23,6 +23,21 @@ import shutil
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# INS-61 defense-in-depth: session cookie hardening + idle timeout.
+# On Render the app is served over HTTPS, so SESSION_COOKIE_SECURE is safe.
+# For local dev set SOURCETECH_INSECURE_COOKIES=1 (e.g. when serving on http://).
+if not os.environ.get('SOURCETECH_INSECURE_COOKIES'):
+    app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+# Lax is the right default for an admin panel: still allows top-level navigation
+# back into /admin after following a link from email, but blocks cross-site POSTs.
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+# Idle-timeout for the admin session. After this many minutes of inactivity
+# the session cookie expires; configurable via ADMIN_SESSION_IDLE_MIN (default 60).
+from datetime import timedelta as _td_session
+_ADMIN_SESSION_IDLE_MIN = int(os.environ.get('ADMIN_SESSION_IDLE_MIN', '60'))
+app.config['PERMANENT_SESSION_LIFETIME'] = _td_session(minutes=_ADMIN_SESSION_IDLE_MIN)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -131,11 +146,31 @@ with app.app_context():
 # ─────────────────────────────────────────────────────────────
 
 def admin_required(f):
-    """Decorator to require admin authentication."""
+    """Decorator to require admin authentication.
+
+    INS-61 hardening: also enforces an idle-timeout. If the session has
+    been inactive for more than ADMIN_SESSION_IDLE_MIN minutes (default 60),
+    the session is cleared and the user is bounced to /admin/login.
+    Activity = any admin_required request. last_seen_at is bumped on each.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('admin_logged_in'):
             return redirect(url_for('admin_login'))
+        # Idle timeout check.
+        last_seen = session.get('admin_last_seen_at')
+        if last_seen:
+            try:
+                last_seen_dt = datetime.fromisoformat(last_seen)
+                if (datetime.now() - last_seen_dt).total_seconds() > _ADMIN_SESSION_IDLE_MIN * 60:
+                    logger.info('Admin session idle-timeout for ip=%s — clearing', request.remote_addr)
+                    session.clear()
+                    return redirect(url_for('admin_login'))
+            except ValueError:
+                # Corrupted timestamp — better to log out than trust it.
+                session.clear()
+                return redirect(url_for('admin_login'))
+        session['admin_last_seen_at'] = datetime.now().isoformat()
         return f(*args, **kwargs)
     return decorated_function
 
@@ -210,7 +245,10 @@ def admin_login():
         # Constant-time comparison — protects against timing side-channels.
         if _hmac.compare_digest(submitted, ADMIN_PASSWORD):
             _admin_clear_failures(ip)
+            session.clear()  # paranoid: drop any pre-login data
             session['admin_logged_in'] = True
+            session['admin_last_seen_at'] = datetime.now().isoformat()
+            session.permanent = True  # enables PERMANENT_SESSION_LIFETIME idle expiry
             logger.info("Admin login success: ip=%s", ip)
             return redirect(url_for('admin_dashboard'))
         _admin_record_failure(ip)
@@ -220,9 +258,37 @@ def admin_login():
 
 @app.route('/admin/logout')
 def admin_logout():
-    """Admin logout."""
-    session.pop('admin_logged_in', None)
+    """Admin logout. Clears the entire session (INS-61 hardening)."""
+    session.clear()
     return redirect(url_for('admin_login'))
+
+
+# INS-61 defense-in-depth: send the standard security headers on every
+# admin response so the browser tightens default behaviour. Public /upload
+# pages also benefit. Customisable via SOURCETECH_DISABLE_SEC_HEADERS=1.
+@app.after_request
+def _apply_security_headers(response):
+    if os.environ.get('SOURCETECH_DISABLE_SEC_HEADERS'):
+        return response
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'same-origin')
+    # Conservative CSP — no inline scripts allowed by default. If a template
+    # needs them, override SOURCETECH_CSP env var.
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        os.environ.get(
+            'SOURCETECH_CSP',
+            "default-src 'self'; img-src 'self' data:; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self'",
+        ),
+    )
+    # HSTS only meaningful over HTTPS — Render terminates TLS at the proxy.
+    if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https':
+        response.headers.setdefault(
+            'Strict-Transport-Security', 'max-age=15552000; includeSubDomains'
+        )
+    return response
 
 
 # ─────────────────────────────────────────────────────────────
