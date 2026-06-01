@@ -995,7 +995,9 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
+        'version': '2.1.0',  # 2.1.0 adds the DealTECH bridge (Ver3 launch)
         'pavtech_available': pavtech_ok,
+        'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()
     })
 
