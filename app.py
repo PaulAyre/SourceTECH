@@ -9,6 +9,7 @@ from pii_stripper import strip_pii
 from pavtech_client import PavTechClient
 from excel_parser import extract_valuation_summary
 from email_service import send_dm_notification
+from dealtech_client import notify_data_received
 import sqlite3
 import secrets
 import os
@@ -30,6 +31,13 @@ logger = logging.getLogger(__name__)
 PAVTECH_API_URL = os.environ.get('PAVTECH_API_URL', 'http://localhost:5000')
 UPLOADS_DIR = os.environ.get('UPLOADS_DIR', 'uploads')  # Persistent file storage
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')  # Change in production!
+# Shared secret for the DealTECH <-> SourceTECH server-to-server API. When set,
+# the /api/vendors* endpoints require a matching X-Webhook-Secret header (and the
+# DealTECH callback in dealtech_client.py sends it). When unset (dev), the API is
+# open and a warning is logged.
+WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
+# Public base URL of THIS SourceTECH service, used to build absolute upload links.
+PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '').rstrip('/')
 
 # Ensure directories exist
 Path(UPLOADS_DIR).mkdir(parents=True, exist_ok=True)
@@ -104,6 +112,16 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_submissions_vendor_id ON submissions(vendor_id);
         CREATE INDEX IF NOT EXISTS idx_vendor_files_vendor_id ON vendor_files(vendor_id);
     ''')
+
+    # Idempotent migration: link a vendor to its DealTECH deal (SourceTECH has no
+    # migration framework, so we ALTER-if-missing). These let the DealTECH->
+    # SourceTECH create API persist the deal, and the upload callback target it.
+    existing_cols = {row[1] for row in db.execute("PRAGMA table_info(vendors)").fetchall()}
+    if "deal_id" not in existing_cols:
+        db.execute("ALTER TABLE vendors ADD COLUMN deal_id INTEGER")
+    if "hubspot_deal_id" not in existing_cols:
+        db.execute("ALTER TABLE vendors ADD COLUMN hubspot_deal_id TEXT")
+
     db.commit()
     db.close()
     logger.info("Database initialized")
@@ -555,7 +573,16 @@ def handle_upload(url_code):
     db.commit()
 
     file_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+    db.execute("UPDATE vendors SET last_submission_at = CURRENT_TIMESTAMP WHERE id = ?", (vendor['id'],))
+    db.commit()
     db.close()
+
+    # Best-effort: notify DealTECH that this deal's inforce data has been received
+    # (PII stripped) so it auto-checks the Ver3 P1 "data received" gate. A DealTECH
+    # outage must never fail the vendor's upload — notify_data_received swallows errors.
+    deal_id = vendor['deal_id'] if 'deal_id' in vendor.keys() else None
+    if deal_id:
+        notify_data_received(deal_id, file_url=_upload_url(url_code))
 
     return jsonify({
         'success': True,
@@ -818,6 +845,138 @@ def success_page(url_code):
         return render_template('error.html', message="Invalid link"), 404
 
     return render_template('success.html', vendor=vendor)
+
+
+# ─────────────────────────────────────────────────────────────
+# DEALTECH SERVER-TO-SERVER API
+# (consumed by DealTECH app/services/sourcetech.py SourceTECHService)
+# ─────────────────────────────────────────────────────────────
+
+def _api_secret_ok() -> bool:
+    """If WEBHOOK_SECRET is configured, require a matching X-Webhook-Secret
+    header on the server-to-server API. If unset (dev), allow + warn."""
+    if not WEBHOOK_SECRET:
+        logger.warning("WEBHOOK_SECRET not set — /api/vendors is unauthenticated")
+        return True
+    return request.headers.get("X-Webhook-Secret") == WEBHOOK_SECRET
+
+
+def _upload_url(url_code: str) -> str:
+    """Absolute vendor upload URL. Prefers PUBLIC_BASE_URL; falls back to host."""
+    base = PUBLIC_BASE_URL or request.host_url.rstrip("/")
+    return f"{base}/{url_code}"
+
+
+@app.route('/api/vendors', methods=['POST'])
+def api_create_vendor():
+    """Create a vendor upload link from DealTECH (JSON).
+
+    Body: {vendor_name, dm_email, dm_name, deal_id, hubspot_deal_id?}
+    Returns: {url_code, vendor_id, upload_url}. Idempotent per deal_id.
+    """
+    if not _api_secret_ok():
+        return jsonify({'error': 'unauthorized'}), 401
+
+    data = request.get_json(silent=True) or {}
+    vendor_name = (data.get('vendor_name') or '').strip()
+    dm_email = (data.get('dm_email') or '').strip()
+    dm_name = (data.get('dm_name') or '').strip()
+    deal_id = data.get('deal_id')
+    hubspot_deal_id = data.get('hubspot_deal_id')
+
+    if not vendor_name:
+        return jsonify({'error': 'vendor_name is required'}), 400
+
+    db = get_db()
+    try:
+        # Idempotent: reuse an existing link for the same deal.
+        if deal_id is not None:
+            existing = db.execute(
+                "SELECT * FROM vendors WHERE deal_id = ? ORDER BY id DESC LIMIT 1",
+                (deal_id,),
+            ).fetchone()
+            if existing:
+                db.close()
+                return jsonify({
+                    'url_code': existing['url_code'],
+                    'vendor_id': existing['id'],
+                    'upload_url': _upload_url(existing['url_code']),
+                    'already_exists': True,
+                })
+
+        url_code = None
+        for _ in range(5):  # retry on url_code collision
+            candidate = secrets.token_urlsafe(6)[:8].upper()
+            try:
+                db.execute('''
+                    INSERT INTO vendors
+                    (url_code, vendor_name, dm_email, dm_name, created_by, deal_id, hubspot_deal_id)
+                    VALUES (?, ?, ?, ?, 'dealtech', ?, ?)
+                ''', (candidate, vendor_name, dm_email, dm_name, deal_id, hubspot_deal_id))
+                db.commit()
+                url_code = candidate
+                break
+            except sqlite3.IntegrityError:
+                continue
+        if not url_code:
+            db.close()
+            return jsonify({'error': 'could not allocate url_code'}), 500
+
+        vendor_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        db.close()
+        return jsonify({
+            'url_code': url_code,
+            'vendor_id': vendor_id,
+            'upload_url': _upload_url(url_code),
+        }), 201
+    except Exception as e:
+        db.close()
+        logger.error("api_create_vendor error: %s", e)
+        return jsonify({'error': 'internal error'}), 500
+
+
+@app.route('/api/vendors/<url_code>/status')
+def api_vendor_status(url_code):
+    """Status for DealTECH polling. Shape matches SourceTECHService.get_vendor_status."""
+    if not _api_secret_ok():
+        return jsonify({'error': 'unauthorized'}), 401
+    db = get_db()
+    vendor = db.execute("SELECT * FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
+    if not vendor:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+    file_count = db.execute(
+        "SELECT COUNT(*) FROM vendor_files WHERE vendor_id = ?", (vendor['id'],)
+    ).fetchone()[0]
+    db.close()
+    # Map SourceTECH vendor.status -> DealTECH processing_status vocabulary.
+    status_map = {'pending': 'pending', 'processing': 'processing',
+                  'complete': 'complete', 'error': 'failed'}
+    return jsonify({
+        'has_uploads': file_count > 0,
+        'submission_count': file_count,
+        'last_upload': vendor['last_submission_at'],
+        'processing_status': status_map.get(vendor['status'], vendor['status'] or 'pending'),
+        'deal_id': vendor['deal_id'],
+    })
+
+
+@app.route('/api/vendors/<url_code>/submissions')
+def api_vendor_submissions(url_code):
+    """List submissions for DealTECH (JSON array)."""
+    if not _api_secret_ok():
+        return jsonify({'error': 'unauthorized'}), 401
+    db = get_db()
+    vendor = db.execute("SELECT id FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
+    if not vendor:
+        db.close()
+        return jsonify({'error': 'not found'}), 404
+    rows = db.execute(
+        "SELECT * FROM submissions WHERE vendor_id = ? ORDER BY submitted_at DESC",
+        (vendor['id'],),
+    ).fetchall()
+    db.close()
+    return jsonify([dict(r) for r in rows])
 
 
 # ─────────────────────────────────────────────────────────────

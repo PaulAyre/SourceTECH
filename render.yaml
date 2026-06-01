@@ -20,6 +20,13 @@ services:
         value: sourcetech@example.com
       - key: ADMIN_PASSWORD
         sync: false
+      # DealTECH bridge
+      - key: DEALTECH_API_URL
+        value: https://dealtech.onrender.com
+      - key: WEBHOOK_SECRET
+        sync: false   # must match DealTECH's WEBHOOK_SECRET exactly
+      - key: PUBLIC_BASE_URL
+        value: https://sourcetech.onrender.com
     disk:
       name: sourcetech-data
       mountPath: /data
