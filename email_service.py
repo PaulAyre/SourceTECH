@@ -38,6 +38,10 @@ DM_CONTACTS = {
     'mike': {
         'name': 'Mike Clifford',
         'email': 'mike@insuranceplus.com.au'
+    },
+    'renee': {
+        'name': 'Renee Hancock',
+        'email': 'renee@insuranceplus.com.au'
     }
 }
 
