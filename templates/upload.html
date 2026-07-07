@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.1" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.2" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='iplogo_with_frame_PNG.png') }}" type="image/png">
 </head>
 <body>
@@ -30,125 +30,89 @@
             <!-- Welcome Card -->
             <div class="st-card st-welcome">
                 <h1>Welcome, {{ vendor.vendor_name }}</h1>
-                <p>Pick the insurers you hold below. Each one opens a guide, a button to launch that insurer's portal beside this page, and a panel you can drop the downloaded file straight onto. We combine everything for your valuation.</p>
-            </div>
-
-            <!-- Insurer selection tiles -->
-            <div class="st-card">
-                <div class="st-card-header">
-                    <h2 class="st-card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                        Select your insurers
-                    </h2>
-                </div>
-                <p class="st-flows-empty">Tick the box on each insurer you hold. Selected insurers move to the front and open their own guided panel below.</p>
-                <div class="st-tile-grid" id="tile-grid">
-                    {% for ins in insurers %}
-                    <div class="st-tile" data-key="{{ ins.key }}" data-selected="{{ 'true' if ins.key in selected_insurers else 'false' }}">
-                        <input type="checkbox" class="st-tile-checkbox" id="tilecb_{{ ins.key }}"
-                               data-key="{{ ins.key }}" aria-label="Include {{ ins.name }}"
-                               {% if ins.key in selected_insurers %}checked{% endif %}>
-                        <span class="st-tile-body">
-                            <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
-                            <span class="st-tile-name">{{ ins.name }}</span>
-                        </span>
-                    </div>
-                    {% endfor %}
-                </div>
+                <p>Tick the insurers you hold. Each tile is a self-contained step: read the guide, open that insurer's portal beside this page, then drag the downloaded file straight onto the tile. We combine everything for your valuation.</p>
             </div>
 
             <!-- Chrome drag tip -->
             <div class="st-drag-tip">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span><strong>Tip:</strong> Click "Open portal" to launch the insurer beside this page. Download your file there, then drag it straight onto that insurer's panel below.</span>
+                <span><strong>Tip:</strong> Open a portal, download your file, then drag it from the download bar straight onto that insurer's tile below.</span>
             </div>
 
-            <!-- Per-insurer guided flow panels (whole panel is a drop target) -->
-            <div id="insurer-flows">
-                <p class="st-flows-empty" id="flows-empty">
-                    No insurers selected yet. Choose the insurers you hold above, or use the box further down to upload a file directly.
-                </p>
-
-                {% for ins in insurers %}
-                <div class="st-insurer-flow" data-key="{{ ins.key }}" data-name="{{ ins.name }}" {% if ins.key not in selected_insurers %}hidden{% endif %}>
-
-                    <!-- Drag overlay (shown while a file is dragged over this panel) -->
-                    <div class="st-flow-dropoverlay">
-                        <svg class="st-flow-dropoverlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <span class="st-flow-dropoverlay-text">Drop {{ ins.name }} file here</span>
-                    </div>
-
-                    <div class="st-flow-header">
-                        <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
-                        <span class="st-flow-name">{{ ins.name }}</span>
-                    </div>
-
-                    {% if ins.portal_url %}
-                    <button type="button" class="st-insurer-link st-portal-btn" data-portal-url="{{ ins.portal_url }}" data-portal-name="{{ ins.name }}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        Open {{ ins.name }} portal
-                    </button>
-                    {% else %}
-                    <span class="st-insurer-link st-insurer-link-disabled" aria-disabled="true" title="Portal link not yet available">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        Open {{ ins.name }} portal
-                    </span>
-                    <span class="st-portal-tbc">portal link TBC</span>
-                    {% endif %}
-
-                    <ol class="st-insurer-steps">
-                        {% for step in ins.steps %}
-                        <li>{{ step|safe }}</li>
-                        {% endfor %}
-                    </ol>
-
-                    {% if ins.format %}<div class="st-insurer-format">{{ ins.format }}</div>{% endif %}
-
-                    {% if ins.hint %}
-                    <div class="st-insurer-hint">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                        {{ ins.hint }}
-                    </div>
-                    {% endif %}
-
-                    <button type="button" class="st-flow-browse">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Choose {{ ins.name }} file
-                    </button>
-                    <span class="st-flow-drophint">or drag the file anywhere onto this panel. Accepts .xlsx, .xls, .csv</span>
-                    <input type="file" class="st-insurer-file-input" accept=".xlsx,.xls,.csv" data-key="{{ ins.key }}" hidden>
-                </div>
-                {% endfor %}
-            </div>
-
-            <!-- General / other upload card (no specific insurer) -->
+            <!-- Unified insurer tiles: select + guide + portal + dropzone, all in one -->
             <div class="st-card">
                 <div class="st-card-header">
                     <h2 class="st-card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Other files
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        Your insurers
                     </h2>
                 </div>
-                <p class="st-flows-empty" style="margin-bottom:1rem;">Have a file that is not from one of the insurers above, or not sure which one it is? Drop it here.</p>
+                <p class="st-flows-empty">Tick the box on each insurer you hold. Selected insurers move to the front and become active upload tiles. Untick to remove.</p>
 
-                <!-- Dropzone -->
-                <div class="st-dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload files by clicking or dragging files here">
-                    <div class="st-dropzone-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div class="st-tile-grid" id="tile-grid">
+                    {% for ins in insurers %}
+                    <div class="st-tile" data-key="{{ ins.key }}" data-name="{{ ins.name }}"
+                         data-selected="{{ 'true' if ins.key in selected_insurers else 'false' }}">
+
+                        <!-- Include/exclude checkbox (only selection control) -->
+                        <input type="checkbox" class="st-tile-checkbox" id="tilecb_{{ ins.key }}"
+                               data-key="{{ ins.key }}" aria-label="Include {{ ins.name }}"
+                               {% if ins.key in selected_insurers %}checked{% endif %}>
+
+                        <!-- DROP HERE overlay (shown while dragging a file over a selected tile) -->
+                        <div class="st-tile-dropoverlay">
+                            <svg class="st-tile-dropoverlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span class="st-tile-dropoverlay-text">Drop {{ ins.name }} file here</span>
+                        </div>
+
+                        <div class="st-tile-head">
+                            <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
+                            <span class="st-tile-name">{{ ins.name }}</span>
+                        </div>
+
+                        <ol class="st-insurer-steps">
+                            {% for step in ins.steps %}
+                            <li>{{ step|safe }}</li>
+                            {% endfor %}
+                        </ol>
+
+                        {% if ins.format %}<div class="st-insurer-format">{{ ins.format }}</div>{% endif %}
+
+                        {% if ins.hint %}
+                        <div class="st-insurer-hint">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            {{ ins.hint }}
+                        </div>
+                        {% endif %}
+
+                        {% if ins.portal_url %}
+                        <button type="button" class="st-insurer-link st-portal-btn" data-portal-url="{{ ins.portal_url }}" data-portal-name="{{ ins.name }}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                            Open {{ ins.name }} portal
+                        </button>
+                        {% else %}
+                        <span class="st-insurer-link st-insurer-link-disabled" aria-disabled="true" title="Portal link not yet available">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                            Open {{ ins.name }} portal
+                        </span>
+                        <span class="st-portal-tbc">portal link TBC</span>
+                        {% endif %}
+
+                        <!-- Resting upload affordance (makes the tile read as a dropzone) -->
+                        <div class="st-tile-affordance">
+                            <svg class="st-tile-affordance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span class="st-tile-affordance-text">Drag a file here to upload</span>
+                            <button type="button" class="st-flow-browse">or choose a file</button>
+                        </div>
+
+                        <input type="file" class="st-insurer-file-input" accept=".xlsx,.xls,.csv" data-key="{{ ins.key }}" hidden>
                     </div>
-                    <div class="st-dropzone-text">Drop files here or click to browse</div>
-                    <div class="st-dropzone-hint">You can drop multiple files, one after the other</div>
-                    <button type="button" class="st-dropzone-btn" onclick="event.stopPropagation(); document.getElementById('file-input').click();">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Choose Files from Your Computer
-                    </button>
-                    <div class="st-dropzone-formats">Accepts .xlsx, .xls, and .csv files</div>
+                    {% endfor %}
                 </div>
-                <input type="file" id="file-input" accept=".xlsx,.xls,.csv" multiple>
 
                 <!-- Current status -->
                 {% if vendor.status and vendor.status != 'pending' %}
-                <div style="margin-top: 0.75rem;">
+                <div style="margin-top: 1rem;">
                     <span class="st-badge st-badge-{{ vendor.status }}">
                         {% if vendor.status == 'processing' %}Processing...
                         {% elif vendor.status == 'complete' %}Valuation Complete
@@ -211,7 +175,7 @@
                             <div class="st-empty-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             </div>
-                            <p>No files uploaded yet. Select your insurers above, follow each guide, then drop the file onto its panel.</p>
+                            <p>No files uploaded yet. Tick your insurers above, follow each guide, then drop the file onto that insurer's tile.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -285,36 +249,20 @@
         let pendingMatch = null;
         let pendingInsurer = '';
 
-        // ── Insurer tiles toggle panels ────────────────────────
-        function panelFor(key) {
-            return document.querySelector(`.st-insurer-flow[data-key="${key}"]`);
-        }
-
-        function updateFlowsEmpty() {
-            const anyVisible = document.querySelector('.st-insurer-flow:not([hidden])');
-            const empty = document.getElementById('flows-empty');
-            if (empty) empty.style.display = anyVisible ? 'none' : '';
-        }
-
-        // The top-right checkbox is the ONLY selection control. Clicking elsewhere
-        // on a tile does nothing. Selected tiles get data-selected="true", which CSS
-        // uses to move them to the front of the grid (order) and keep full colour;
-        // unselected tiles grey out.
+        // ── Insurer tile selection (top-right checkbox is the ONLY control) ──
+        // Selected tiles get data-selected="true": CSS moves them to the front,
+        // keeps them full colour, and makes them active drop targets. Unselected
+        // tiles grey out and ignore drops.
         document.querySelectorAll('.st-tile-checkbox').forEach(cb => {
             cb.addEventListener('change', () => {
-                const key = cb.dataset.key;
                 const tile = cb.closest('.st-tile');
-                const panel = panelFor(key);
-                const nowOn = cb.checked;
-                if (tile) tile.dataset.selected = nowOn ? 'true' : 'false';
-                if (panel) {
-                    panel.hidden = !nowOn;
-                    if (nowOn) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-                updateFlowsEmpty();
+                if (tile) tile.dataset.selected = cb.checked ? 'true' : 'false';
             });
         });
-        updateFlowsEmpty();
+
+        function tileSelected(tile) {
+            return tile && tile.dataset.selected === 'true';
+        }
 
         // ── Open insurer portal in a sized pop-out window ──────
         // User-gesture triggered so it is not popup-blocked. If the browser still
@@ -345,59 +293,46 @@
             });
         });
 
-        // ── Whole-panel drag-and-drop per insurer ──────────────
-        document.querySelectorAll('.st-insurer-flow').forEach(panel => {
-            const key = panel.dataset.key;
-            const input = panel.querySelector('.st-insurer-file-input');
-            const browse = panel.querySelector('.st-flow-browse');
+        // ── Whole-tile drag-and-drop (active only when the tile is selected) ──
+        document.querySelectorAll('.st-tile').forEach(tile => {
+            const key = tile.dataset.key;
+            const input = tile.querySelector('.st-insurer-file-input');
+            const browse = tile.querySelector('.st-flow-browse');
             let depth = 0; // dragenter/leave fire per child; count to avoid flicker
 
-            if (browse) browse.addEventListener('click', () => input.click());
+            if (browse) browse.addEventListener('click', () => {
+                if (tileSelected(tile)) input.click();
+            });
             input.addEventListener('change', (e) => {
                 handleFiles(e.target.files, key);
                 input.value = '';
             });
 
-            panel.addEventListener('dragenter', (e) => {
+            tile.addEventListener('dragenter', (e) => {
                 e.preventDefault();
+                if (!tileSelected(tile)) return;
                 depth++;
-                panel.classList.add('drag-active');
+                tile.classList.add('drag-active');
             });
-            panel.addEventListener('dragover', (e) => {
+            // Always preventDefault on dragover so the browser never navigates to
+            // the dropped file, even over an unselected tile.
+            tile.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+                if (e.dataTransfer) e.dataTransfer.dropEffect = tileSelected(tile) ? 'copy' : 'none';
             });
-            panel.addEventListener('dragleave', (e) => {
+            tile.addEventListener('dragleave', (e) => {
+                if (!tileSelected(tile)) return;
                 depth = Math.max(0, depth - 1);
-                if (depth === 0) panel.classList.remove('drag-active');
+                if (depth === 0) tile.classList.remove('drag-active');
             });
-            panel.addEventListener('drop', (e) => {
+            tile.addEventListener('drop', (e) => {
                 e.preventDefault();
                 depth = 0;
-                panel.classList.remove('drag-active');
+                tile.classList.remove('drag-active');
+                if (!tileSelected(tile)) return; // unselected tiles are not drop targets
                 if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files, key);
             });
         });
-
-        // ── General dropzone (no insurer tag) ──────────────────
-        (function () {
-            const dz = document.getElementById('dropzone');
-            const input = document.getElementById('file-input');
-            dz.addEventListener('click', () => input.click());
-            dz.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
-            });
-            dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag-over'); });
-            dz.addEventListener('dragleave', (e) => {
-                if (!dz.contains(e.relatedTarget)) dz.classList.remove('drag-over');
-            });
-            dz.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dz.classList.remove('drag-over');
-                handleFiles(e.dataTransfer.files, '');
-            });
-            input.addEventListener('change', (e) => { handleFiles(e.target.files, ''); input.value = ''; });
-        })();
 
         // ── Smart file handling with duplicate detection ───────
         function normalizeFilename(name) {
@@ -604,7 +539,7 @@
                             <div class="st-empty-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             </div>
-                            <p>No files uploaded yet. Select your insurers above, follow each guide, then drop the file onto its panel.</p>
+                            <p>No files uploaded yet. Tick your insurers above, follow each guide, then drop the file onto that insurer's tile.</p>
                         </div>
                     `;
                     const btn = document.getElementById('revaluate-btn');

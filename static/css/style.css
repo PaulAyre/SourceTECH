@@ -1269,18 +1269,22 @@ h1, h2, h3, h4, h5, h6 {
 .gap-2 { gap: 1rem; }
 
 
-/* --- Insurer selection tile grid --- */
+/* --- Unified insurer tiles: select + guide + portal + dropzone in one --- */
 .st-tile-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 0.75rem;
-    margin-top: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
 }
 
 .st-tile {
     position: relative;
-    border: 2px solid var(--border-medium);
-    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1.1rem;
+    border: 2px dashed var(--border-dark);
+    border-radius: var(--radius-lg);
     background: var(--bg-card);
     transition: var(--transition-fast);
 }
@@ -1288,49 +1292,39 @@ h1, h2, h3, h4, h5, h6 {
 /* Selected tiles cluster at the front of the grid and stay full colour. */
 .st-tile[data-selected="true"] {
     order: 0;
+    border-style: solid;
     border-color: var(--primary);
-    background: var(--brand-green-light);
-    box-shadow: inset 0 0 0 1px var(--primary);
+    background: var(--bg-green-tint);
 }
 
-/* Unselected tiles follow and grey out. */
+/* Unselected tiles follow, grey out, and are not active drop targets. */
 .st-tile[data-selected="false"] {
     order: 1;
     filter: grayscale(1);
-    opacity: 0.6;
+    opacity: 0.55;
 }
 
 .st-tile[data-selected="false"]:hover {
     filter: grayscale(0.4);
-    opacity: 0.9;
-    border-color: var(--brand-green-mid);
+    opacity: 0.85;
 }
 
-.st-tile-body {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.9rem 2.1rem 0.9rem 1rem;
-    text-align: left;
-}
-
-.st-tile-name {
-    flex: 1;
-    font-weight: 600;
-    font-size: var(--font-size-sm);
-    color: var(--text-primary);
-    line-height: 1.2;
+/* While a file is dragged over a selected tile. */
+.st-tile.drag-active {
+    border-style: solid;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(45, 122, 74, 0.18);
 }
 
 .st-tile-checkbox {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 10px;
+    right: 10px;
     width: 20px;
     height: 20px;
     accent-color: var(--primary);
     cursor: pointer;
-    z-index: 2;
+    z-index: 3;
     margin: 0;
 }
 
@@ -1339,49 +1333,53 @@ h1, h2, h3, h4, h5, h6 {
     outline-offset: 2px;
 }
 
-/* --- Per-insurer guided flow panels (full-panel drop targets) --- */
-.st-flows-empty {
-    font-size: var(--font-size-sm);
-    color: var(--text-muted);
-    margin: 0;
-}
-
-.st-insurer-flow {
-    position: relative;
-    border: 2px dashed var(--border-medium);
-    border-left: 4px solid var(--primary);
-    border-radius: var(--radius-md);
-    padding: 1.25rem;
-    margin-top: 1rem;
-    background: var(--bg-green-tint);
-    transition: var(--transition-fast);
-}
-
-.st-insurer-flow[hidden] {
-    display: none;
-}
-
-.st-insurer-flow.drag-active {
-    border-color: var(--primary);
-    border-style: solid;
-    box-shadow: 0 0 0 4px rgba(45, 122, 74, 0.18);
-}
-
-.st-flow-header {
+.st-tile-head {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 0.6rem;
+    padding-right: 1.9rem;
 }
 
-.st-flow-name {
+.st-tile-name {
     font-weight: 700;
     font-size: var(--font-size-md);
     color: var(--text-primary);
+    line-height: 1.2;
 }
 
-/* Drag overlay covering the whole panel */
-.st-flow-dropoverlay {
+/* Resting upload affordance so each tile reads as a dropzone. */
+.st-tile-affordance {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.9rem;
+    border: 2px dashed var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-muted);
+    text-align: center;
+}
+
+.st-tile[data-selected="true"] .st-tile-affordance {
+    border-color: var(--brand-green-mid);
+    background: var(--bg-card);
+}
+
+.st-tile-affordance-icon {
+    width: 28px;
+    height: 28px;
+    color: var(--primary);
+}
+
+.st-tile-affordance-text {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Whole-tile DROP HERE overlay while dragging over a selected tile. */
+.st-tile-dropoverlay {
     position: absolute;
     inset: 0;
     display: none;
@@ -1389,25 +1387,25 @@ h1, h2, h3, h4, h5, h6 {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    background: rgba(232, 245, 233, 0.96);
-    border-radius: var(--radius-md);
-    z-index: 5;
+    background: rgba(232, 245, 233, 0.97);
+    border-radius: var(--radius-lg);
+    z-index: 4;
     pointer-events: none;
     text-align: center;
     padding: 1rem;
 }
 
-.st-insurer-flow.drag-active .st-flow-dropoverlay {
+.st-tile.drag-active .st-tile-dropoverlay {
     display: flex;
 }
 
-.st-flow-dropoverlay-icon {
-    width: 48px;
-    height: 48px;
+.st-tile-dropoverlay-icon {
+    width: 44px;
+    height: 44px;
     color: var(--primary);
 }
 
-.st-flow-dropoverlay-text {
+.st-tile-dropoverlay-text {
     font-size: var(--font-size-md);
     font-weight: 700;
     color: var(--brand-green-dark);
@@ -1440,12 +1438,11 @@ h1, h2, h3, h4, h5, h6 {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    margin-top: 1rem;
-    padding: 0.5rem 1rem;
-    background: var(--bg-card);
+    padding: 0.35rem 0.9rem;
+    background: transparent;
     border: 1px solid var(--border-dark);
     border-radius: var(--radius-pill);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
@@ -1458,11 +1455,10 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--primary);
 }
 
-.st-flow-drophint {
-    display: block;
-    margin-top: 0.75rem;
-    font-size: var(--font-size-xs);
+.st-flows-empty {
+    font-size: var(--font-size-sm);
     color: var(--text-muted);
+    margin: 0;
 }
 
 .st-file-insurer-badge {
