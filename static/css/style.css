@@ -129,9 +129,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .st-header-logo {
-    height: 40px;
+    height: 44px;
     width: auto;
-    border-radius: var(--radius-sm);
+    display: block;
 }
 
 .st-header-title {
