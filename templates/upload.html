@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.3" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.4" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='iplogo_with_frame_PNG.png') }}" type="image/png">
 </head>
 <body>
@@ -67,7 +67,13 @@
 
                         <div class="st-tile-head">
                             <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
+                            {% if ins.portal_url %}
+                            <a href="{{ ins.portal_url }}" target="_blank" rel="noopener"
+                               class="st-tile-name st-tile-title-link st-portal-btn"
+                               data-portal-url="{{ ins.portal_url }}" data-portal-name="{{ ins.name }}">{{ ins.name }} <span class="st-tile-open">(Open)</span></a>
+                            {% else %}
                             <span class="st-tile-name">{{ ins.name }}</span>
+                            {% endif %}
                         </div>
 
                         <ol class="st-insurer-steps">
@@ -76,26 +82,11 @@
                             {% endfor %}
                         </ol>
 
-                        {% if ins.format %}<div class="st-insurer-format">{{ ins.format }}</div>{% endif %}
-
                         {% if ins.hint %}
                         <div class="st-insurer-hint">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                             {{ ins.hint }}
                         </div>
-                        {% endif %}
-
-                        {% if ins.portal_url %}
-                        <button type="button" class="st-insurer-link st-portal-btn" data-portal-url="{{ ins.portal_url }}" data-portal-name="{{ ins.name }}">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open {{ ins.name }} portal
-                        </button>
-                        {% else %}
-                        <span class="st-insurer-link st-insurer-link-disabled" aria-disabled="true" title="Portal link not yet available">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open {{ ins.name }} portal
-                        </span>
-                        <span class="st-portal-tbc">portal link TBC</span>
                         {% endif %}
 
                         <!-- Resting upload affordance (makes the tile read as a dropzone) -->

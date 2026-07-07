@@ -373,29 +373,6 @@ h1, h2, h3, h4, h5, h6 {
     border-top: 1px solid var(--border-light);
 }
 
-.st-insurer-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin-top: 0.4rem;
-    padding: 0.4rem 0.8rem;
-    background: linear-gradient(135deg, var(--brand-green) 0%, var(--brand-green-mid) 100%);
-    color: var(--text-white);
-    text-decoration: none;
-    border-radius: var(--radius-pill);
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-    transition: var(--transition-normal);
-    letter-spacing: 0.01em;
-}
-
-.st-insurer-link:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-green);
-    color: var(--text-white);
-    text-decoration: none;
-}
-
 .st-insurer-hint {
     margin-top: 0.5rem;
     padding: 0.5rem 0.75rem;
@@ -409,16 +386,6 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 1.4;
 }
 
-.st-insurer-format {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    background: var(--bg-muted);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-    font-weight: 500;
-    margin-top: 0.5rem;
-}
 
 
 /* --- Main Content Area --- */
@@ -1311,16 +1278,12 @@ h1, h2, h3, h4, h5, h6 {
     background: var(--bg-green-tint);
 }
 
-/* Unselected tiles follow, grey out, and are not active drop targets. */
+/* Unselected tiles follow, grey out, and are not active drop targets. They
+   stay fully greyed even on hover; only ticking the checkbox restores colour. */
 .st-tile[data-selected="false"] {
     order: 1;
     filter: grayscale(1);
     opacity: 0.55;
-}
-
-.st-tile[data-selected="false"]:hover {
-    filter: grayscale(0.4);
-    opacity: 0.85;
 }
 
 /* While a file is dragged over a selected tile. */
@@ -1365,6 +1328,22 @@ h1, h2, h3, h4, h5, h6 {
     font-size: var(--font-size-sm);
     color: var(--text-primary);
     line-height: 1.2;
+}
+
+/* Insurer title doubles as the portal link; "(Open)" is the underlined cue. */
+.st-tile-title-link {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.st-tile-title-link:hover {
+    color: var(--primary);
+}
+
+.st-tile-open {
+    text-decoration: underline;
+    color: var(--primary);
+    font-weight: 700;
 }
 
 /* Resting upload affordance so each tile reads as a dropzone. */
@@ -1429,29 +1408,6 @@ h1, h2, h3, h4, h5, h6 {
     font-size: var(--font-size-sm);
     font-weight: 700;
     color: var(--brand-green-dark);
-}
-
-.st-insurer-link {
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-}
-
-.st-insurer-link-disabled {
-    background: var(--bg-muted) !important;
-    color: var(--text-muted) !important;
-    cursor: not-allowed;
-    box-shadow: none !important;
-    transform: none !important;
-    opacity: 0.7;
-}
-
-.st-portal-tbc {
-    display: inline-block;
-    margin-left: 0.5rem;
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    font-style: italic;
 }
 
 .st-flow-browse {

@@ -71,7 +71,7 @@ INSURERS = [
             "Drop the downloaded file in the box below",
         ],
         "format": "Formats: XLS, CSV, PDF",
-        "hint": "Requires an AIA Adviser Code. Contact au.retailadviseradmin@aia.com if you need one.",
+        "hint": "",
     },
     {
         "key": "tal", "name": "TAL (incl. Asteron)", "badge": "TAL", "color": "#003087",
@@ -113,7 +113,7 @@ INSURERS = [
             "Drop the downloaded file in the box below",
         ],
         "format": "Formats: Client reports",
-        "hint": "MLC Limited is now Acenda (formerly Nippon Life Insurance AU/NZ). Your username starts with C or a number (not your Adviser Code).",
+        "hint": "MLC Limited is now Acenda (formerly Nippon Life Insurance AU/NZ).",
     },
     {
         "key": "metlife", "name": "MetLife Australia", "badge": "MET", "color": "#00a94f",
@@ -126,7 +126,7 @@ INSURERS = [
             "Drop the downloaded file in the box below",
         ],
         "format": "Formats: Contact BDM for export",
-        "hint": "Need an adviser code? Visit metlife.com.au/adviser-partnerships/get-an-adviser-code",
+        "hint": "",
     },
     {
         "key": "clearview", "name": "ClearView", "badge": "CLV", "color": "#0077c8",
