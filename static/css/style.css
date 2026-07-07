@@ -128,8 +128,18 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-white);
 }
 
+/* White pill so the dark wordmark logo reads crisply on the green header. */
+.st-logo-pill {
+    display: inline-flex;
+    align-items: center;
+    background: #ffffff;
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
 .st-header-logo {
-    height: 44px;
+    height: 32px;
     width: auto;
     display: block;
 }
