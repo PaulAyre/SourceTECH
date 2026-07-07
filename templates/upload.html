@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.5" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.6" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='iplogo_with_frame_PNG.png') }}" type="image/png">
 </head>
 <body>
@@ -50,6 +50,31 @@
                 <p class="st-flows-empty">Tick the box on each insurer you hold. Selected insurers move to the front and become active upload tiles. Untick to remove.</p>
 
                 <div class="st-tile-grid" id="tile-grid">
+                    <!-- Catch-all "Other / unassigned" tile: always first, always active, multi-file -->
+                    <div class="st-tile st-tile-other" id="other-slot">
+                        <div class="st-tile-dropoverlay">
+                            <svg class="st-tile-dropoverlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span class="st-tile-dropoverlay-text">Drop files here</span>
+                        </div>
+
+                        <div class="st-tile-head">
+                            <span class="st-insurer-icon" style="background: var(--brand-navy);">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            </span>
+                            <span class="st-tile-name">Other / unassigned</span>
+                        </div>
+
+                        <p class="st-tile-other-desc">For anything that does not match an insurer. Add as many files as you like; each is tagged "Other / unassigned".</p>
+
+                        <div class="st-tile-affordance">
+                            <svg class="st-tile-affordance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span class="st-tile-affordance-text">Drag files here or click to browse</span>
+                            <button type="button" class="st-flow-browse" id="other-browse">Choose files</button>
+                        </div>
+
+                        <input type="file" id="other-file-input" accept=".xlsx,.xls,.csv" multiple hidden>
+                    </div>
+
                     {% for ins in insurers %}
                     <div class="st-tile" data-key="{{ ins.key }}" data-name="{{ ins.name }}"
                          data-selected="{{ 'true' if ins.key in selected_insurers else 'false' }}">
@@ -125,28 +150,6 @@
                         <li>Your files are processed securely</li>
                     </ul>
                 </div>
-            </div>
-
-            <!-- Catch-all: Other / unassigned multi-file slot (always available, no checkbox) -->
-            <div class="st-card st-other-slot" id="other-slot">
-                <div class="st-other-overlay">
-                    <svg class="st-other-overlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <span class="st-other-overlay-text">Drop files here</span>
-                </div>
-                <div class="st-card-header">
-                    <h2 class="st-card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                        Other / unassigned files
-                    </h2>
-                </div>
-                <p class="st-flows-empty" style="margin-bottom: 0.75rem;">A permanent catch-all for anything that does not match an insurer above. Add as many files as you like; each is tagged "Other / unassigned" and appears in Your Files below.</p>
-                <div class="st-other-affordance">
-                    <svg class="st-other-affordance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                    <div class="st-other-affordance-text">Drag files here or click to browse</div>
-                    <div class="st-other-affordance-sub">for anything that does not match an insurer above</div>
-                    <button type="button" class="st-flow-browse" id="other-browse">Choose files</button>
-                </div>
-                <input type="file" id="other-file-input" accept=".xlsx,.xls,.csv" multiple hidden>
             </div>
 
             <!-- File List Card -->
@@ -308,7 +311,9 @@
         });
 
         // ── Whole-tile drag-and-drop (active only when the tile is selected) ──
-        document.querySelectorAll('.st-tile').forEach(tile => {
+        // Scoped to insurer tiles ([data-key]); the Other catch-all tile has its
+        // own always-active handler below.
+        document.querySelectorAll('.st-tile[data-key]').forEach(tile => {
             const key = tile.dataset.key;
             const input = tile.querySelector('.st-insurer-file-input');
             const browse = tile.querySelector('.st-flow-browse');

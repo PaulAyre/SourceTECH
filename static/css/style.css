@@ -1450,81 +1450,20 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 
-/* --- Catch-all "Other / unassigned" slot (full width, distinct from tiles) --- */
-.st-other-slot {
-    position: relative;
-    border: 2px dashed var(--border-dark);
+/* --- Catch-all "Other / unassigned" tile: standard tile size, always first --- */
+.st-tile-other {
+    order: -1;                 /* always ahead of every insurer tile */
     border-left: 4px solid var(--brand-navy);
     background: var(--bg-muted);
 }
 
-.st-other-slot.drag-active {
-    border-style: solid;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 4px rgba(45, 122, 74, 0.18);
-}
-
-.st-other-overlay {
-    position: absolute;
-    inset: 0;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    background: rgba(232, 245, 233, 0.97);
-    border-radius: var(--radius-lg);
-    z-index: 4;
-    pointer-events: none;
-    text-align: center;
-    padding: 1rem;
-}
-
-.st-other-slot.drag-active .st-other-overlay {
-    display: flex;
-}
-
-.st-other-overlay-icon {
-    width: 44px;
-    height: 44px;
-    color: var(--primary);
-}
-
-.st-other-overlay-text {
-    font-size: var(--font-size-md);
-    font-weight: 700;
-    color: var(--brand-green-dark);
-}
-
-.st-other-affordance {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 1.5rem;
-    border: 2px dashed var(--border-medium);
-    border-radius: var(--radius-md);
-    background: var(--bg-card);
-    text-align: center;
-}
-
-.st-other-affordance-icon {
-    width: 34px;
-    height: 34px;
+.st-tile-other .st-tile-affordance-icon {
     color: var(--brand-navy);
 }
 
-.st-other-affordance-text {
-    font-size: var(--font-size-sm);
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.st-other-affordance-sub {
+.st-tile-other-desc {
     font-size: var(--font-size-xs);
-    color: var(--text-muted);
-}
-
-.st-other-affordance .st-flow-browse {
-    margin-top: 0.5rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin: 0.1rem 0 0 0;
 }
