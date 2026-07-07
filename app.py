@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Config
 PAVTECH_API_URL = os.environ.get('PAVTECH_API_URL', 'http://localhost:5000')
-UPLOADS_DIR = os.environ.get('UPLOADS_DIR', 'uploads')  # Persistent file storage
+UPLOADS_DIR = os.environ.get('UPLOADS_DIR', 'uploads')  # On Render set to /data/uploads (persistent disk); local dev falls back to ./uploads
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'changeme')  # Change in production!
 # Shared secret for the DealTECH <-> SourceTECH server-to-server API. When set,
 # the /api/vendors* endpoints require a matching X-Webhook-Secret header (and the

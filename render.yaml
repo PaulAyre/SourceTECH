@@ -16,6 +16,10 @@ services:
         value: /data/sourcetech.db
       - key: TEMP_DIR
         value: /data/temp
+      # Uploaded vendor files must live on the persistent disk (/data), not the
+      # ephemeral container filesystem, so they survive restarts/redeploys.
+      - key: UPLOADS_DIR
+        value: /data/uploads
       - key: FROM_EMAIL
         value: sourcetech@example.com
       - key: ADMIN_PASSWORD
