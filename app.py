@@ -188,6 +188,21 @@ INSURERS = [
 INSURER_KEYS = {ins["key"] for ins in INSURERS}
 INSURER_NAME_BY_KEY = {ins["key"]: ins["name"] for ins in INSURERS}
 
+# Special catch-all tag for files that do not map to any named insurer. Uploaded
+# via the always-available "Other / unassigned" slot; a valid tag value so
+# downstream (PavTECH/DealTECH) can see the file is deliberately unclassified.
+OTHER_KEY = "other"
+OTHER_LABEL = "Other / unassigned"
+
+
+def insurer_label(key):
+    """Human label for a stored insurer tag (catalogue name, 'Other / unassigned', or None)."""
+    if not key:
+        return None
+    if key == OTHER_KEY:
+        return OTHER_LABEL
+    return INSURER_NAME_BY_KEY.get(key)
+
 
 def clean_insurer_keys(raw) -> list:
     """Normalise + validate a list of insurer keys against the catalogue.
@@ -597,7 +612,7 @@ def upload_page(url_code):
     for f in files:
         d = dict(f)
         ins_key = d.get('insurer') if 'insurer' in d else None
-        d['insurer_name'] = INSURER_NAME_BY_KEY.get(ins_key) if ins_key else None
+        d['insurer_name'] = insurer_label(ins_key)
         files_out.append(d)
 
     return render_template('upload.html',
@@ -636,7 +651,7 @@ def list_files(url_code):
     out = []
     for f in files:
         d = dict(f)
-        d['insurer_name'] = INSURER_NAME_BY_KEY.get(d.get('insurer')) if d.get('insurer') else None
+        d['insurer_name'] = insurer_label(d.get('insurer'))
         out.append(d)
 
     return jsonify({
@@ -694,10 +709,15 @@ def handle_upload(url_code):
     action = request.form.get('action', 'auto')  # auto, replace, add_new
 
     # Optional insurer tag (which insurer this file belongs to). Validated against
-    # the catalogue; anything unknown/blank falls back to None (plain upload), so
-    # the legacy single-file / no-insurer path keeps working unchanged.
-    _clean = clean_insurer_keys([request.form.get('insurer', '')])
-    insurer_key = _clean[0] if _clean else None
+    # the catalogue; the special "other" tag (catch-all slot) is allowed through;
+    # anything else unknown/blank falls back to None so the legacy no-insurer path
+    # keeps working unchanged.
+    raw_insurer = (request.form.get('insurer', '') or '').strip().lower()
+    if raw_insurer == OTHER_KEY:
+        insurer_key = OTHER_KEY
+    else:
+        _clean = clean_insurer_keys([raw_insurer])
+        insurer_key = _clean[0] if _clean else None
 
     if match and score > 0.6 and action == 'auto' and not replace_file_id:
         # Found potential match - ask user what to do
@@ -797,7 +817,7 @@ def handle_upload(url_code):
         'file_id': file_id,
         'filename': file.filename,
         'insurer': insurer_key,
-        'insurer_name': INSURER_NAME_BY_KEY.get(insurer_key) if insurer_key else None,
+        'insurer_name': insurer_label(insurer_key),
         'valid': validation['valid'],
         'positives': validation.get('positives', []),
         'warnings': validation.get('warnings', []),
