@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.8" rel="stylesheet">
-    <link rel="icon" href="{{ url_for('static', filename='images/insuranceplus_logo.png') }}" type="image/png">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.9" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='images/iPlus.png') }}" type="image/png">
 </head>
 <body>
-    <!-- Header (InsurancePLUS wordmark logo on a white pill, matching PavTECH) -->
+    <!-- Header (InsurancePLUS wordmark + borderless i+ icon) -->
     <header class="st-header">
         <a href="/" class="st-header-brand">
-            <span class="st-logo-pill">
-                <img src="{{ url_for('static', filename='images/insuranceplus_logo.png') }}" alt="InsurancePLUS" class="st-header-logo">
-            </span>
-            <p class="st-header-subtitle">Portfolio Upload Portal</p>
+            <img src="{{ url_for('static', filename='images/iPlus.png') }}" alt="InsurancePLUS" class="st-header-logo">
+            <div>
+                <h1 class="st-header-title"><span class="light">insurance</span><span class="bold">PLUS</span></h1>
+                <p class="st-header-subtitle">Portfolio Upload Portal</p>
+            </div>
         </a>
         <div class="st-header-right">
             <span class="st-header-badge">Secure Upload</span>
