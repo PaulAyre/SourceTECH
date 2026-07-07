@@ -20,8 +20,11 @@ services:
       # ephemeral container filesystem, so they survive restarts/redeploys.
       - key: UPLOADS_DIR
         value: /data/uploads
+      # DM notification email via Resend (verified sender domain insuranceplus.com.au)
       - key: FROM_EMAIL
-        value: sourcetech@example.com
+        value: SourceTECH <sourcetech@insuranceplus.com.au>
+      - key: RESEND_API_KEY
+        sync: false   # copied from DealTECH's Resend key on the service
       - key: ADMIN_PASSWORD
         sync: false
       # DealTECH bridge

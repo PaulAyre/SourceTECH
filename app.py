@@ -615,10 +615,21 @@ def upload_page(url_code):
         d['insurer_name'] = insurer_label(ins_key)
         files_out.append(d)
 
+    # Group files by the tile they belong to: a known insurer key, else 'other'
+    # (covers the "other" tag and any legacy untagged files). Used to render each
+    # file inside its own tile instead of a shared list.
+    files_by_insurer = {}
+    for d in files_out:
+        key = d.get('insurer')
+        if key not in INSURER_KEYS:
+            key = OTHER_KEY
+        files_by_insurer.setdefault(key, []).append(d)
+
     return render_template('upload.html',
         vendor=vendor,
         url_code=url_code,
         files=files_out,
+        files_by_insurer=files_by_insurer,
         latest_submission=dict(latest_submission) if latest_submission else None,
         insurers=INSURERS,
         selected_insurers=selected_insurers
@@ -867,8 +878,15 @@ def delete_file(url_code, file_id):
 
 
 @app.route('/<url_code>/revaluate', methods=['POST'])
+@app.route('/<url_code>/submit', methods=['POST'])
 def trigger_revaluation(url_code):
-    """Trigger revaluation of all files in portfolio."""
+    """Submit the portfolio: build the working set and run the PavTECH valuation.
+
+    Exposed at both /submit (the vendor-facing "Submit to InsurancePLUS" action)
+    and /revaluate (legacy alias). The working set is deduped by ORIGINAL filename
+    keeping only the latest upload of each name, so re-uploading an edited file
+    with the same name replaces the older version rather than sending both.
+    """
     db = get_db()
     vendor = db.execute(
         "SELECT * FROM vendors WHERE url_code = ?",
@@ -879,15 +897,25 @@ def trigger_revaluation(url_code):
         db.close()
         return jsonify({'error': 'Invalid link'}), 404
 
-    # Get all files for this vendor
-    files = db.execute('''
+    # Get all files, newest first, then dedupe by original_filename (latest wins).
+    all_files = db.execute('''
         SELECT * FROM vendor_files
         WHERE vendor_id = ?
+        ORDER BY uploaded_at DESC, id DESC
     ''', (vendor['id'],)).fetchall()
 
-    if not files:
+    if not all_files:
         db.close()
         return jsonify({'error': 'No files to process'}), 400
+
+    seen_names = set()
+    files = []
+    for f in all_files:
+        name = f['original_filename']
+        if name in seen_names:
+            continue  # older version of a same-named file; skip
+        seen_names.add(name)
+        files.append(f)
 
     # Collect file paths
     file_paths = [Path(f['file_path']) for f in files if Path(f['file_path']).exists()]
@@ -895,6 +923,9 @@ def trigger_revaluation(url_code):
     if not file_paths:
         db.close()
         return jsonify({'error': 'No valid files found'}), 400
+
+    logger.info("Submit %s: %d uploads deduped to %d working files by filename",
+                url_code, len(all_files), len(file_paths))
 
     # Update vendor status
     db.execute('''
@@ -972,18 +1003,22 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
             ''', (vendor['id'],))
             db.commit()
 
-            # Send notification email
-            from email_service import send_portfolio_update_notification
-            send_portfolio_update_notification(
-                dm_key=vendor.get('dm_name', 'paul').split()[0].lower(),
+            # Notify the Deal Manager at the vendor's STORED dm_email (not a
+            # hardcoded contact lookup), with the valuation master attached.
+            ok, info = send_dm_notification(
+                to_email=vendor['dm_email'],
+                dm_name=vendor['dm_name'],
                 vendor_name=vendor['vendor_name'],
                 url_code=vendor['url_code'],
-                file_count=len(file_paths),
-                files_summary=files_summary,
                 valuation=valuation,
-                assumptions=list(set(all_assumptions)),
-                attachment_path=master_path
+                attachment_path=master_path,
             )
+            if ok:
+                logger.info("DM valuation-complete email sent to %s (resend id=%s)",
+                            vendor['dm_email'], info.get('id'))
+            else:
+                logger.error("DM valuation-complete email FAILED to %s: %s",
+                             vendor['dm_email'], info)
 
             logger.info(f"Complete: {vendor['vendor_name']} - {result.get('total_policies', 0)} policies, ${result.get('total_valuation', 0):,.0f} valuation")
 

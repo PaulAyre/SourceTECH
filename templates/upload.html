@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.9" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.10" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='images/iPlus_white.png') }}" type="image/png">
 </head>
 <body>
@@ -18,8 +18,10 @@
             </div>
         </a>
         <div class="st-header-right">
-            <span class="st-header-badge">Secure Upload</span>
-            <span class="st-header-version">v2.1</span>
+            <button type="button" class="st-btn st-btn-primary st-submit-btn" id="submit-btn" onclick="triggerSubmit()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Submit to InsurancePLUS
+            </button>
         </div>
     </header>
 
@@ -27,10 +29,19 @@
     <div class="st-app-layout">
         <main class="st-main st-main-wide">
 
+            <!-- Submitted confirmation (revealed after Submit) -->
+            <div class="st-card st-submitted-card" id="submitted-card" style="display: none;">
+                <div class="st-submitted">
+                    <div class="st-submitted-icon">&#10003;</div>
+                    <h3>Submitted</h3>
+                    <p id="submitted-msg">InsurancePLUS will process your portfolio. You can close this page; we will email your Deal Manager when the valuation is ready.</p>
+                </div>
+            </div>
+
             <!-- Welcome Card -->
             <div class="st-card st-welcome">
                 <h1>Portfolio upload for {{ vendor.vendor_name }}</h1>
-                <p>Tick the insurers you hold. Each tile is a self-contained step: read the guide, open that insurer's portal beside this page, then drag the downloaded file straight onto the tile. We combine everything for your valuation.</p>
+                <p>Tick the insurers you hold. Each tile is a self-contained step: read the guide, open that insurer's portal beside this page, then drag the downloaded file straight onto the tile. When you are done, click Submit to InsurancePLUS (top right).</p>
             </div>
 
             <!-- Chrome drag tip -->
@@ -47,7 +58,7 @@
                         Your insurers
                     </h2>
                 </div>
-                <p class="st-flows-empty">Tick the box on each insurer you hold. Selected insurers move to the front and become active upload tiles. Untick to remove.</p>
+                <p class="st-flows-empty">Tick the box on each insurer you hold. Selected insurers move to the front and become active upload tiles. Untick to remove. The catch-all "Other / unassigned" tile is always available.</p>
 
                 <div class="st-tile-grid" id="tile-grid">
                     <!-- Catch-all "Other / unassigned" tile: always first, always active, multi-file -->
@@ -66,6 +77,16 @@
 
                         <p class="st-tile-other-desc">For anything that does not match an insurer. Add as many files as you like; each is tagged "Other / unassigned".</p>
 
+                        <div class="st-tile-files" data-key="other">
+                            {% for f in files_by_insurer.get('other', []) %}
+                            <div class="st-tile-file" data-file-id="{{ f.id }}">
+                                <svg class="st-tile-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span class="st-tile-file-name">{{ f.original_filename }}</span>
+                                <button class="st-tile-file-remove" onclick="deleteFile({{ f.id }})">Remove</button>
+                            </div>
+                            {% endfor %}
+                        </div>
+
                         <div class="st-tile-affordance">
                             <svg class="st-tile-affordance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <span class="st-tile-affordance-text">Drag files here or click to browse</span>
@@ -79,12 +100,10 @@
                     <div class="st-tile" data-key="{{ ins.key }}" data-name="{{ ins.name }}"
                          data-selected="{{ 'true' if ins.key in selected_insurers else 'false' }}">
 
-                        <!-- Include/exclude checkbox (only selection control) -->
                         <input type="checkbox" class="st-tile-checkbox" id="tilecb_{{ ins.key }}"
                                data-key="{{ ins.key }}" aria-label="Include {{ ins.name }}"
                                {% if ins.key in selected_insurers %}checked{% endif %}>
 
-                        <!-- DROP HERE overlay (shown while dragging a file over a selected tile) -->
                         <div class="st-tile-dropoverlay">
                             <svg class="st-tile-dropoverlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <span class="st-tile-dropoverlay-text">Drop {{ ins.name }} file here</span>
@@ -114,7 +133,16 @@
                         </div>
                         {% endif %}
 
-                        <!-- Resting upload affordance (makes the tile read as a dropzone) -->
+                        <div class="st-tile-files" data-key="{{ ins.key }}">
+                            {% for f in files_by_insurer.get(ins.key, []) %}
+                            <div class="st-tile-file" data-file-id="{{ f.id }}">
+                                <svg class="st-tile-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                <span class="st-tile-file-name">{{ f.original_filename }}</span>
+                                <button class="st-tile-file-remove" onclick="deleteFile({{ f.id }})">Remove</button>
+                            </div>
+                            {% endfor %}
+                        </div>
+
                         <div class="st-tile-affordance">
                             <svg class="st-tile-affordance-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                             <span class="st-tile-affordance-text">Drag a file here to upload</span>
@@ -126,7 +154,6 @@
                     {% endfor %}
                 </div>
 
-                <!-- Current status -->
                 {% if vendor.status and vendor.status != 'pending' %}
                 <div style="margin-top: 1rem;">
                     <span class="st-badge st-badge-{{ vendor.status }}">
@@ -138,7 +165,6 @@
                 </div>
                 {% endif %}
 
-                <!-- Privacy info -->
                 <div class="st-privacy">
                     <h4>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -150,61 +176,6 @@
                         <li>Your files are processed securely</li>
                     </ul>
                 </div>
-            </div>
-
-            <!-- File List Card -->
-            <div class="st-card">
-                <div class="st-card-header">
-                    <h2 class="st-card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                        Your Files ({{ files|length if files else 0 }})
-                    </h2>
-                </div>
-
-                <div class="st-file-list" id="file-list">
-                    {% if files and files|length > 0 %}
-                        {% for file in files %}
-                        <div class="st-file-item {{ 'warning' if file.status == 'warning' else '' }}" data-file-id="{{ file.id }}">
-                            <div class="st-file-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            </div>
-                            <div class="st-file-info">
-                                <div class="st-file-name">
-                                    {{ file.original_filename }}
-                                    {% if file.insurer_name %}<span class="st-file-insurer-badge">{{ file.insurer_name }}</span>{% endif %}
-                                </div>
-                                <div class="st-file-meta">
-                                    {{ file.policy_count or 0 }} policies
-                                    {% if file.status == 'warning' %} &bull; Has warnings{% endif %}
-                                    &bull; Uploaded {{ file.uploaded_at[:10] if file.uploaded_at else 'Recently' }}
-                                </div>
-                            </div>
-                            <div class="st-file-actions">
-                                <button class="st-btn st-btn-danger" onclick="deleteFile({{ file.id }}, '{{ file.original_filename }}')">
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="st-empty">
-                            <div class="st-empty-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                            </div>
-                            <p>No files uploaded yet. Tick your insurers above, follow each guide, then drop the file onto that insurer's tile.</p>
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Revaluate button -->
-                {% if files and files|length > 0 %}
-                <div style="margin-top: 1.5rem; text-align: center;">
-                    <button class="st-btn st-btn-primary st-btn-primary-lg" id="revaluate-btn" onclick="triggerRevaluation()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                        Get Portfolio Valuation
-                    </button>
-                </div>
-                {% endif %}
             </div>
 
             <!-- Latest valuation results -->
@@ -222,7 +193,7 @@
                         ${{ '{:,.0f}'.format((latest_submission.valuation_summary|tojson|fromjson).get('estimated_value', 0) if latest_submission.valuation_summary else 0) }}
                     </div>
                     <div class="st-valuation-note">
-                        Based on {{ files|length if files else 0 }} file(s) &bull; Updated {{ latest_submission.submitted_at[:10] if latest_submission.submitted_at else 'Recently' }}
+                        Updated {{ latest_submission.submitted_at[:10] if latest_submission.submitted_at else 'Recently' }}
                     </div>
                 </div>
             </div>
@@ -257,19 +228,12 @@
 
     <script>
         const urlCode = '{{ url_code }}';
-        // key -> name map for badge labels on refreshed file rows.
-        const INSURER_NAME_MAP = {
-            {% for ins in insurers %}'{{ ins.key }}': {{ ins.name|tojson }},{% endfor %}
-            'other': 'Other / unassigned',
-        };
+        const INSURER_KEYS = new Set([{% for ins in insurers %}'{{ ins.key }}',{% endfor %}]);
         let pendingFile = null;
         let pendingMatch = null;
         let pendingInsurer = '';
 
         // ── Insurer tile selection (top-right checkbox is the ONLY control) ──
-        // Selected tiles get data-selected="true": CSS moves them to the front,
-        // keeps them full colour, and makes them active drop targets. Unselected
-        // tiles grey out and ignore drops.
         document.querySelectorAll('.st-tile-checkbox').forEach(cb => {
             cb.addEventListener('change', () => {
                 const tile = cb.closest('.st-tile');
@@ -281,18 +245,18 @@
             return tile && tile.dataset.selected === 'true';
         }
 
+        function tileKeyFor(insurer) {
+            return INSURER_KEYS.has(insurer) ? insurer : 'other';
+        }
+
         // ── Open insurer portal in a sized pop-out window ──────
-        // User-gesture triggered so it is not popup-blocked. If the browser still
-        // blocks it (window.open returns null), fall back to a normal new tab so
-        // it never silently fails. win.opener nulled for noopener security.
         function openPortal(url, name) {
             const availW = screen.availWidth || 1280;
             const availH = screen.availHeight || 800;
             const w = Math.min(1100, Math.floor(availW * 0.5));
             const h = Math.floor(availH * 0.9);
             const left = Math.max(0, availW - w);
-            const top = 0;
-            const features = `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+            const features = `width=${w},height=${h},left=${left},top=0,resizable=yes,scrollbars=yes`;
             let win = null;
             try { win = window.open(url, 'st_portal_' + name, features); } catch (e) { win = null; }
             if (win) {
@@ -310,79 +274,52 @@
             });
         });
 
-        // ── Whole-tile drag-and-drop (active only when the tile is selected) ──
-        // Scoped to insurer tiles ([data-key]); the Other catch-all tile has its
-        // own always-active handler below.
+        // ── Whole-tile drag-and-drop (insurer tiles, active only when selected) ──
         document.querySelectorAll('.st-tile[data-key]').forEach(tile => {
             const key = tile.dataset.key;
             const input = tile.querySelector('.st-insurer-file-input');
             const browse = tile.querySelector('.st-flow-browse');
-            let depth = 0; // dragenter/leave fire per child; count to avoid flicker
+            let depth = 0;
 
-            if (browse) browse.addEventListener('click', () => {
-                if (tileSelected(tile)) input.click();
-            });
-            input.addEventListener('change', (e) => {
-                handleFiles(e.target.files, key);
-                input.value = '';
-            });
+            if (browse) browse.addEventListener('click', () => { if (tileSelected(tile)) input.click(); });
+            input.addEventListener('change', (e) => { handleFiles(e.target.files, key); input.value = ''; });
 
             tile.addEventListener('dragenter', (e) => {
                 e.preventDefault();
                 if (!tileSelected(tile)) return;
-                depth++;
-                tile.classList.add('drag-active');
+                depth++; tile.classList.add('drag-active');
             });
-            // Always preventDefault on dragover so the browser never navigates to
-            // the dropped file, even over an unselected tile.
             tile.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 if (e.dataTransfer) e.dataTransfer.dropEffect = tileSelected(tile) ? 'copy' : 'none';
             });
-            tile.addEventListener('dragleave', (e) => {
+            tile.addEventListener('dragleave', () => {
                 if (!tileSelected(tile)) return;
                 depth = Math.max(0, depth - 1);
                 if (depth === 0) tile.classList.remove('drag-active');
             });
             tile.addEventListener('drop', (e) => {
                 e.preventDefault();
-                depth = 0;
-                tile.classList.remove('drag-active');
-                if (!tileSelected(tile)) return; // unselected tiles are not drop targets
+                depth = 0; tile.classList.remove('drag-active');
+                if (!tileSelected(tile)) return;
                 if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files, key);
             });
         });
 
-        // ── Catch-all "Other / unassigned" slot (always active, multi-file) ──
+        // ── Catch-all "Other" tile: always active, multi-file ──
         (function () {
             const slot = document.getElementById('other-slot');
             const input = document.getElementById('other-file-input');
             const browse = document.getElementById('other-browse');
             if (!slot) return;
             let depth = 0;
-
             browse.addEventListener('click', () => input.click());
-            input.addEventListener('change', (e) => {
-                handleFiles(e.target.files, 'other');
-                input.value = '';
-            });
-            slot.addEventListener('dragenter', (e) => {
-                e.preventDefault();
-                depth++;
-                slot.classList.add('drag-active');
-            });
-            slot.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
-            });
-            slot.addEventListener('dragleave', (e) => {
-                depth = Math.max(0, depth - 1);
-                if (depth === 0) slot.classList.remove('drag-active');
-            });
+            input.addEventListener('change', (e) => { handleFiles(e.target.files, 'other'); input.value = ''; });
+            slot.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; slot.classList.add('drag-active'); });
+            slot.addEventListener('dragover', (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; });
+            slot.addEventListener('dragleave', () => { depth = Math.max(0, depth - 1); if (depth === 0) slot.classList.remove('drag-active'); });
             slot.addEventListener('drop', (e) => {
-                e.preventDefault();
-                depth = 0;
-                slot.classList.remove('drag-active');
+                e.preventDefault(); depth = 0; slot.classList.remove('drag-active');
                 if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files, 'other');
             });
         })();
@@ -399,10 +336,9 @@
 
         function findDuplicateFile(newFilename) {
             const normalized = normalizeFilename(newFilename);
-            const fileItems = document.querySelectorAll('.st-file-item[data-file-id]');
-            for (const item of fileItems) {
-                const nameEl = item.querySelector('.st-file-name');
-                const existingName = nameEl ? (nameEl.childNodes[0]?.textContent || nameEl.textContent).trim() : '';
+            for (const item of document.querySelectorAll('.st-tile-file[data-file-id]')) {
+                const nameEl = item.querySelector('.st-tile-file-name');
+                const existingName = nameEl ? nameEl.textContent.trim() : '';
                 if (normalizeFilename(existingName) === normalized) {
                     return { id: item.dataset.fileId, name: existingName };
                 }
@@ -426,15 +362,12 @@
                 pendingMatch = {
                     filename: duplicate.name,
                     fileId: duplicate.id,
-                    similarity: 100,
                     message: `"${file.name}" looks like an updated version of "${duplicate.name}". Replace the old one?`
                 };
                 pendingQueue = { files, nextIndex: index + 1, insurer };
                 showConfirmModal(pendingMatch);
             } else {
-                uploadFile(file, 'auto', null, insurer, () => {
-                    processFileQueue(files, index + 1, insurer);
-                });
+                uploadFile(file, 'auto', null, insurer, () => processFileQueue(files, index + 1, insurer));
             }
         }
 
@@ -461,8 +394,8 @@
                 }
 
                 if (result.success) {
-                    showToast('File uploaded successfully!', 'success');
-                    refreshFileList();
+                    showToast('File uploaded', 'success');
+                    refreshTileFiles();
                     showProcessingSummary(result.processing_summary);
                 } else if (result.error) {
                     showToast(result.error, 'error');
@@ -476,43 +409,61 @@
             if (onComplete) onComplete();
         }
 
+        function uploadingId(filename) {
+            return `uploading-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        }
+
         function addUploadingFile(filename, insurer = '') {
-            const fileList = document.getElementById('file-list');
-            const emptyState = fileList.querySelector('.st-empty');
-            if (emptyState) emptyState.remove();
-
-            const badge = insurer && INSURER_NAME_MAP[insurer]
-                ? ` <span class="st-file-insurer-badge">${INSURER_NAME_MAP[insurer]}</span>` : '';
-
+            const container = document.querySelector(`.st-tile-files[data-key="${tileKeyFor(insurer)}"]`);
+            if (!container) return;
             const div = document.createElement('div');
-            div.className = 'st-file-item uploading';
-            div.id = `uploading-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
-            div.innerHTML = `
-                <div class="st-file-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                </div>
-                <div class="st-file-info">
-                    <div class="st-file-name">${filename}${badge}</div>
-                    <div class="st-file-meta">Uploading and processing...</div>
-                </div>
-            `;
-            fileList.insertBefore(div, fileList.firstChild);
+            div.className = 'st-tile-file uploading';
+            div.id = uploadingId(filename);
+            const icon = '<svg class="st-tile-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+            div.innerHTML = icon + '<span class="st-tile-file-name"></span><span class="st-tile-file-status">Uploading...</span>';
+            div.querySelector('.st-tile-file-name').textContent = filename;
+            container.appendChild(div);
         }
 
         function removeUploadingFile(filename) {
-            const el = document.getElementById(`uploading-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`);
+            const el = document.getElementById(uploadingId(filename));
             if (el) el.remove();
         }
 
-        // ── File operations ────────────────────────────────────
-        async function deleteFile(fileId, filename) {
-            if (!confirm(`Remove "${filename}" from your portfolio?`)) return;
+        // ── Per-tile file rendering ────────────────────────────
+        function makeFileRow(id, name) {
+            const div = document.createElement('div');
+            div.className = 'st-tile-file';
+            div.dataset.fileId = id;
+            const icon = '<svg class="st-tile-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+            div.innerHTML = icon + '<span class="st-tile-file-name"></span><button class="st-tile-file-remove">Remove</button>';
+            div.querySelector('.st-tile-file-name').textContent = name;
+            div.querySelector('.st-tile-file-remove').addEventListener('click', () => deleteFile(id));
+            return div;
+        }
+
+        async function refreshTileFiles() {
+            try {
+                const response = await fetch(`/${urlCode}/files`);
+                const data = await response.json();
+                document.querySelectorAll('.st-tile-files').forEach(c => { c.innerHTML = ''; });
+                for (const f of data.files) {
+                    const container = document.querySelector(`.st-tile-files[data-key="${tileKeyFor(f.insurer)}"]`);
+                    if (container) container.appendChild(makeFileRow(f.id, f.original_filename));
+                }
+            } catch (err) {
+                console.error('Failed to refresh tile files:', err);
+            }
+        }
+
+        async function deleteFile(fileId) {
+            if (!confirm('Remove this file?')) return;
             try {
                 const response = await fetch(`/${urlCode}/files/${fileId}`, { method: 'DELETE' });
                 const result = await response.json();
                 if (result.success) {
-                    showToast(`Removed ${filename}`, 'success');
-                    refreshFileList();
+                    showToast('File removed', 'success');
+                    refreshTileFiles();
                 } else {
                     showToast(result.error || 'Failed to delete', 'error');
                 }
@@ -521,42 +472,42 @@
             }
         }
 
-        async function triggerRevaluation() {
-            const btn = document.getElementById('revaluate-btn');
+        // ── Submit to InsurancePLUS ────────────────────────────
+        async function triggerSubmit() {
+            const btn = document.getElementById('submit-btn');
+            const original = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Submitting...';
+            btn.innerHTML = 'Submitting...';
             try {
-                const response = await fetch(`/${urlCode}/revaluate`, { method: 'POST' });
+                const response = await fetch(`/${urlCode}/submit`, { method: 'POST' });
                 const result = await response.json();
                 if (result.success) {
                     showSubmittedState(result.file_count);
                 } else {
-                    showToast(result.error || 'Failed to start processing', 'error');
+                    showToast(result.error || 'Submit failed', 'error');
                     btn.disabled = false;
-                    btn.textContent = 'Get Portfolio Valuation';
+                    btn.innerHTML = original;
                 }
             } catch (err) {
-                showToast('Request failed. Please try again.', 'error');
+                showToast('Submit failed. Please try again.', 'error');
                 btn.disabled = false;
-                btn.textContent = 'Get Portfolio Valuation';
+                btn.innerHTML = original;
             }
         }
 
         function showSubmittedState(fileCount) {
-            const btnContainer = document.getElementById('revaluate-btn').parentElement;
-            btnContainer.innerHTML = `
-                <div class="st-submitted">
-                    <div class="st-submitted-icon">&#10003;</div>
-                    <h3>Files Submitted Successfully!</h3>
-                    <p>We're processing ${fileCount} file${fileCount > 1 ? 's' : ''} now.</p>
-                    <div class="st-submitted-note">
-                        <strong>You don't need to wait!</strong><br>
-                        We'll email your Deal Manager when the valuation is ready.
-                        Feel free to close this page.
-                    </div>
-                </div>
-            `;
-            showToast('Submitted! Check your email soon.', 'success');
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.classList.add('submitted');
+            btn.innerHTML = '&#10003; Submitted';
+            const card = document.getElementById('submitted-card');
+            const msg = document.getElementById('submitted-msg');
+            if (msg && fileCount) {
+                msg.textContent = `InsurancePLUS is now processing ${fileCount} file${fileCount > 1 ? 's' : ''}. You can close this page; we will email your Deal Manager when the valuation is ready.`;
+            }
+            card.style.display = 'block';
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            showToast('Submitted to InsurancePLUS', 'success');
         }
 
         // ── Status polling ─────────────────────────────────────
@@ -567,84 +518,12 @@
                 if (status.status === 'processing') {
                     setTimeout(pollStatus, 3000);
                 } else if (status.status === 'complete') {
-                    showToast('Valuation complete!', 'success');
-                    location.reload();
+                    showToast('Valuation complete', 'success');
                 } else if (status.status === 'error') {
                     showToast('Processing encountered an error', 'error');
-                    location.reload();
                 }
             } catch (err) {
                 setTimeout(pollStatus, 5000);
-            }
-        }
-
-        // ── Refresh file list ──────────────────────────────────
-        async function refreshFileList() {
-            try {
-                const response = await fetch(`/${urlCode}/files`);
-                const data = await response.json();
-                const fileList = document.getElementById('file-list');
-                fileList.innerHTML = '';
-
-                if (data.files.length === 0) {
-                    fileList.innerHTML = `
-                        <div class="st-empty">
-                            <div class="st-empty-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                            </div>
-                            <p>No files uploaded yet. Tick your insurers above, follow each guide, then drop the file onto that insurer's tile.</p>
-                        </div>
-                    `;
-                    const btn = document.getElementById('revaluate-btn');
-                    if (btn) btn.style.display = 'none';
-                    return;
-                }
-
-                const fileIconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
-
-                for (const file of data.files) {
-                    const div = document.createElement('div');
-                    div.className = `st-file-item ${file.status === 'warning' ? 'warning' : ''}`;
-                    div.dataset.fileId = file.id;
-                    const badge = file.insurer_name
-                        ? ` <span class="st-file-insurer-badge">${file.insurer_name}</span>` : '';
-                    div.innerHTML = `
-                        <div class="st-file-icon">${fileIconSvg}</div>
-                        <div class="st-file-info">
-                            <div class="st-file-name">${file.original_filename}${badge}</div>
-                            <div class="st-file-meta">
-                                ${file.policy_count || 0} policies
-                                ${file.status === 'warning' ? ' &bull; Has warnings' : ''}
-                                &bull; Uploaded ${file.uploaded_at ? file.uploaded_at.slice(0, 10) : 'Recently'}
-                            </div>
-                        </div>
-                        <div class="st-file-actions">
-                            <button class="st-btn st-btn-danger" onclick="deleteFile(${file.id}, '${file.original_filename.replace(/'/g, "\\'")}')">
-                                Remove
-                            </button>
-                        </div>
-                    `;
-                    fileList.appendChild(div);
-                }
-
-                let btn = document.getElementById('revaluate-btn');
-                if (!btn && data.files.length > 0) {
-                    const container = fileList.parentElement;
-                    const btnDiv = document.createElement('div');
-                    btnDiv.style.marginTop = '1.5rem';
-                    btnDiv.style.textAlign = 'center';
-                    btnDiv.innerHTML = `<button class="st-btn st-btn-primary st-btn-primary-lg" id="revaluate-btn" onclick="triggerRevaluation()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                        Get Portfolio Valuation
-                    </button>`;
-                    container.appendChild(btnDiv);
-                } else if (btn) {
-                    btn.style.display = data.files.length > 0 ? 'inline-flex' : 'none';
-                    btn.disabled = false;
-                    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Get Portfolio Valuation`;
-                }
-            } catch (err) {
-                console.error('Failed to refresh file list:', err);
             }
         }
 
@@ -661,7 +540,6 @@
                 return `<div class="${cls}">${item}</div>`;
             }).join('');
             card.style.display = 'block';
-            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
         // ── Confirm modal ──────────────────────────────────────
@@ -729,7 +607,6 @@
         pollStatus();
         {% endif %}
 
-        // ── Spin animation for loading ─────────────────────────
         const style = document.createElement('style');
         style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
         document.head.appendChild(style);
