@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.1" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='iplogo_with_frame_PNG.png') }}" type="image/png">
 </head>
 <body>
@@ -25,75 +25,69 @@
 
     <!-- App Layout -->
     <div class="st-app-layout">
-
-        <!-- LEFT SIDEBAR: Insurer picker -->
-        <aside class="st-sidebar" id="sidebar">
-            <div class="st-sidebar-header">
-                <h2 class="st-sidebar-title">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                    Select your insurers
-                </h2>
-                <p class="st-sidebar-subtitle">Tick each insurer you hold. We will show you exactly how to download that insurer's data and where to drop it.</p>
-            </div>
-
-            <div class="st-sidebar-search">
-                <input type="text" class="st-search-input" id="insurer-search" placeholder="Search insurers...">
-            </div>
-
-            <div class="st-insurer-list" id="insurer-list">
-                {% for ins in insurers %}
-                <div class="st-insurer-item" data-insurer="{{ ins.search }}">
-                    <label class="st-insurer-check-row">
-                        <input type="checkbox" class="st-insurer-check" data-key="{{ ins.key }}"
-                               {% if ins.key in selected_insurers %}checked{% endif %}>
-                        <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
-                        <span class="st-insurer-name">{{ ins.name }}</span>
-                    </label>
-                </div>
-                {% endfor %}
-            </div><!-- /insurer-list -->
-        </aside>
-
-        <!-- MAIN CONTENT -->
-        <main class="st-main">
+        <main class="st-main st-main-wide">
 
             <!-- Welcome Card -->
             <div class="st-card st-welcome">
                 <h1>Welcome, {{ vendor.vendor_name }}</h1>
-                <p>Tick the insurers you hold on the left. For each one you will get a step-by-step download guide, a button to open that insurer's portal, and a labelled box to drop the file into. We combine everything for your valuation.</p>
+                <p>Pick the insurers you hold below. Each one opens a guide, a button to launch that insurer's portal beside this page, and a panel you can drop the downloaded file straight onto. We combine everything for your valuation.</p>
+            </div>
+
+            <!-- Insurer selection tiles -->
+            <div class="st-card">
+                <div class="st-card-header">
+                    <h2 class="st-card-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        Select your insurers
+                    </h2>
+                </div>
+                <p class="st-flows-empty">Tick the box on each insurer you hold. Selected insurers move to the front and open their own guided panel below.</p>
+                <div class="st-tile-grid" id="tile-grid">
+                    {% for ins in insurers %}
+                    <div class="st-tile" data-key="{{ ins.key }}" data-selected="{{ 'true' if ins.key in selected_insurers else 'false' }}">
+                        <input type="checkbox" class="st-tile-checkbox" id="tilecb_{{ ins.key }}"
+                               data-key="{{ ins.key }}" aria-label="Include {{ ins.name }}"
+                               {% if ins.key in selected_insurers %}checked{% endif %}>
+                        <span class="st-tile-body">
+                            <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
+                            <span class="st-tile-name">{{ ins.name }}</span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
 
             <!-- Chrome drag tip -->
             <div class="st-drag-tip">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span><strong>Tip:</strong> Using Chrome? Open an insurer portal in one tab, download the file, then drag it straight from Chrome's download bar into that insurer's box below.</span>
+                <span><strong>Tip:</strong> Click "Open portal" to launch the insurer beside this page. Download your file there, then drag it straight onto that insurer's panel below.</span>
             </div>
 
-            <!-- Per-insurer guided flows -->
-            <div class="st-card" id="insurer-flows-card">
-                <div class="st-card-header">
-                    <h2 class="st-card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                        Your insurers
-                    </h2>
-                </div>
-
+            <!-- Per-insurer guided flow panels (whole panel is a drop target) -->
+            <div id="insurer-flows">
                 <p class="st-flows-empty" id="flows-empty">
-                    No insurers selected yet. Tick the insurers you hold in the list on the left (or use the box below to upload a file directly).
+                    No insurers selected yet. Choose the insurers you hold above, or use the box further down to upload a file directly.
                 </p>
 
                 {% for ins in insurers %}
-                <div class="st-insurer-flow" data-key="{{ ins.key }}" {% if ins.key not in selected_insurers %}hidden{% endif %}>
+                <div class="st-insurer-flow" data-key="{{ ins.key }}" data-name="{{ ins.name }}" {% if ins.key not in selected_insurers %}hidden{% endif %}>
+
+                    <!-- Drag overlay (shown while a file is dragged over this panel) -->
+                    <div class="st-flow-dropoverlay">
+                        <svg class="st-flow-dropoverlay-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span class="st-flow-dropoverlay-text">Drop {{ ins.name }} file here</span>
+                    </div>
+
                     <div class="st-flow-header">
                         <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
                         <span class="st-flow-name">{{ ins.name }}</span>
                     </div>
 
                     {% if ins.portal_url %}
-                    <a href="{{ ins.portal_url }}" target="_blank" rel="noopener" class="st-insurer-link">
+                    <button type="button" class="st-insurer-link st-portal-btn" data-portal-url="{{ ins.portal_url }}" data-portal-name="{{ ins.name }}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                         Open {{ ins.name }} portal
-                    </a>
+                    </button>
                     {% else %}
                     <span class="st-insurer-link st-insurer-link-disabled" aria-disabled="true" title="Portal link not yet available">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -117,16 +111,12 @@
                     </div>
                     {% endif %}
 
-                    <!-- Per-insurer dropzone -->
-                    <div class="st-dropzone st-insurer-dropzone" data-key="{{ ins.key }}" role="button" tabindex="0" aria-label="Upload {{ ins.name }} file">
-                        <div class="st-dropzone-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        </div>
-                        <div class="st-dropzone-text">Drop {{ ins.name }} file here</div>
-                        <div class="st-dropzone-hint">or click to browse for the {{ ins.name }} download</div>
-                        <div class="st-dropzone-formats">Accepts .xlsx, .xls, and .csv files</div>
-                        <input type="file" class="st-insurer-file-input" accept=".xlsx,.xls,.csv" data-key="{{ ins.key }}" hidden>
-                    </div>
+                    <button type="button" class="st-flow-browse">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Choose {{ ins.name }} file
+                    </button>
+                    <span class="st-flow-drophint">or drag the file anywhere onto this panel. Accepts .xlsx, .xls, .csv</span>
+                    <input type="file" class="st-insurer-file-input" accept=".xlsx,.xls,.csv" data-key="{{ ins.key }}" hidden>
                 </div>
                 {% endfor %}
             </div>
@@ -221,7 +211,7 @@
                             <div class="st-empty-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             </div>
-                            <p>No files uploaded yet. Tick your insurers on the left, follow the guide, then drop each file in its box.</p>
+                            <p>No files uploaded yet. Select your insurers above, follow each guide, then drop the file onto its panel.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -269,12 +259,6 @@
         </main>
     </div><!-- /app-layout -->
 
-    <!-- Sidebar toggle (mobile) -->
-    <button class="st-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle insurer picker">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    </button>
-    <div class="st-sidebar-overlay" id="sidebar-overlay"></div>
-
     <!-- Confirmation Modal -->
     <div class="st-modal-overlay" id="confirm-modal">
         <div class="st-modal">
@@ -293,7 +277,7 @@
 
     <script>
         const urlCode = '{{ url_code }}';
-        // Build a key -> name map for badge labels on refreshed file rows.
+        // key -> name map for badge labels on refreshed file rows.
         const INSURER_NAME_MAP = {
             {% for ins in insurers %}'{{ ins.key }}': {{ ins.name|tojson }},{% endfor %}
         };
@@ -301,7 +285,7 @@
         let pendingMatch = null;
         let pendingInsurer = '';
 
-        // ── Sidebar: insurer checkboxes reveal per-insurer panels ──
+        // ── Insurer tiles toggle panels ────────────────────────
         function panelFor(key) {
             return document.querySelector(`.st-insurer-flow[data-key="${key}"]`);
         }
@@ -312,86 +296,108 @@
             if (empty) empty.style.display = anyVisible ? 'none' : '';
         }
 
-        document.querySelectorAll('.st-insurer-check').forEach(cb => {
+        // The top-right checkbox is the ONLY selection control. Clicking elsewhere
+        // on a tile does nothing. Selected tiles get data-selected="true", which CSS
+        // uses to move them to the front of the grid (order) and keep full colour;
+        // unselected tiles grey out.
+        document.querySelectorAll('.st-tile-checkbox').forEach(cb => {
             cb.addEventListener('change', () => {
                 const key = cb.dataset.key;
+                const tile = cb.closest('.st-tile');
                 const panel = panelFor(key);
-                if (!panel) return;
-                if (cb.checked) {
-                    panel.hidden = false;
-                    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                } else {
-                    panel.hidden = true;
+                const nowOn = cb.checked;
+                if (tile) tile.dataset.selected = nowOn ? 'true' : 'false';
+                if (panel) {
+                    panel.hidden = !nowOn;
+                    if (nowOn) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
                 updateFlowsEmpty();
             });
         });
         updateFlowsEmpty();
 
-        // Insurer search filter (filters the checkbox list)
-        document.getElementById('insurer-search').addEventListener('input', function() {
-            const query = this.value.toLowerCase();
-            document.querySelectorAll('#insurer-list .st-insurer-item').forEach(item => {
-                const name = item.getAttribute('data-insurer') || '';
-                const text = item.textContent.toLowerCase();
-                item.style.display = (name.includes(query) || text.includes(query)) ? '' : 'none';
-            });
-        });
+        // ── Open insurer portal in a sized pop-out window ──────
+        // User-gesture triggered so it is not popup-blocked. If the browser still
+        // blocks it (window.open returns null), fall back to a normal new tab so
+        // it never silently fails. win.opener nulled for noopener security.
+        function openPortal(url, name) {
+            const availW = screen.availWidth || 1280;
+            const availH = screen.availHeight || 800;
+            const w = Math.min(1100, Math.floor(availW * 0.5));
+            const h = Math.floor(availH * 0.9);
+            const left = Math.max(0, availW - w);
+            const top = 0;
+            const features = `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+            let win = null;
+            try { win = window.open(url, 'st_portal_' + name, features); } catch (e) { win = null; }
+            if (win) {
+                try { win.opener = null; } catch (e) {}
+                try { win.focus(); } catch (e) {}
+            } else {
+                window.open(url, '_blank');
+            }
+        }
 
-        // ── Mobile sidebar toggle ──────────────────────────────
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebar-toggle');
-        const sidebarOverlay = document.getElementById('sidebar-overlay');
-
-        sidebarToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('open');
-            sidebarOverlay.classList.toggle('visible');
-        });
-
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('open');
-            sidebarOverlay.classList.remove('visible');
-        });
-
-        // ── Dropzone wiring ────────────────────────────────────
-        function wireDropzone(dz, input, insurer) {
-            dz.addEventListener('click', (e) => {
-                if (e.target === input) return;
-                input.click();
-            });
-            dz.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    input.click();
-                }
-            });
-            dz.addEventListener('dragover', (e) => {
+        document.querySelectorAll('.st-portal-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                dz.classList.add('drag-over');
+                openPortal(btn.dataset.portalUrl, btn.dataset.portalName);
             });
+        });
+
+        // ── Whole-panel drag-and-drop per insurer ──────────────
+        document.querySelectorAll('.st-insurer-flow').forEach(panel => {
+            const key = panel.dataset.key;
+            const input = panel.querySelector('.st-insurer-file-input');
+            const browse = panel.querySelector('.st-flow-browse');
+            let depth = 0; // dragenter/leave fire per child; count to avoid flicker
+
+            if (browse) browse.addEventListener('click', () => input.click());
+            input.addEventListener('change', (e) => {
+                handleFiles(e.target.files, key);
+                input.value = '';
+            });
+
+            panel.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                depth++;
+                panel.classList.add('drag-active');
+            });
+            panel.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            });
+            panel.addEventListener('dragleave', (e) => {
+                depth = Math.max(0, depth - 1);
+                if (depth === 0) panel.classList.remove('drag-active');
+            });
+            panel.addEventListener('drop', (e) => {
+                e.preventDefault();
+                depth = 0;
+                panel.classList.remove('drag-active');
+                if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files, key);
+            });
+        });
+
+        // ── General dropzone (no insurer tag) ──────────────────
+        (function () {
+            const dz = document.getElementById('dropzone');
+            const input = document.getElementById('file-input');
+            dz.addEventListener('click', () => input.click());
+            dz.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+            });
+            dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('drag-over'); });
             dz.addEventListener('dragleave', (e) => {
                 if (!dz.contains(e.relatedTarget)) dz.classList.remove('drag-over');
             });
             dz.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dz.classList.remove('drag-over');
-                handleFiles(e.dataTransfer.files, insurer);
+                handleFiles(e.dataTransfer.files, '');
             });
-            input.addEventListener('change', (e) => {
-                handleFiles(e.target.files, insurer);
-                input.value = '';
-            });
-        }
-
-        // General dropzone (no insurer tag)
-        wireDropzone(document.getElementById('dropzone'), document.getElementById('file-input'), '');
-
-        // Per-insurer dropzones (tag each upload with its insurer key)
-        document.querySelectorAll('.st-insurer-dropzone').forEach(dz => {
-            const key = dz.dataset.key;
-            const input = dz.querySelector('.st-insurer-file-input');
-            wireDropzone(dz, input, key);
-        });
+            input.addEventListener('change', (e) => { handleFiles(e.target.files, ''); input.value = ''; });
+        })();
 
         // ── Smart file handling with duplicate detection ───────
         function normalizeFilename(name) {
@@ -406,7 +412,6 @@
         function findDuplicateFile(newFilename) {
             const normalized = normalizeFilename(newFilename);
             const fileItems = document.querySelectorAll('.st-file-item[data-file-id]');
-
             for (const item of fileItems) {
                 const nameEl = item.querySelector('.st-file-name');
                 const existingName = nameEl ? (nameEl.childNodes[0]?.textContent || nameEl.textContent).trim() : '';
@@ -425,10 +430,8 @@
 
         function processFileQueue(files, index, insurer = '') {
             if (index >= files.length) return;
-
             const file = files[index];
             const duplicate = findDuplicateFile(file.name);
-
             if (duplicate) {
                 pendingFile = file;
                 pendingInsurer = insurer;
@@ -516,11 +519,9 @@
         // ── File operations ────────────────────────────────────
         async function deleteFile(fileId, filename) {
             if (!confirm(`Remove "${filename}" from your portfolio?`)) return;
-
             try {
                 const response = await fetch(`/${urlCode}/files/${fileId}`, { method: 'DELETE' });
                 const result = await response.json();
-
                 if (result.success) {
                     showToast(`Removed ${filename}`, 'success');
                     refreshFileList();
@@ -536,11 +537,9 @@
             const btn = document.getElementById('revaluate-btn');
             btn.disabled = true;
             btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Submitting...';
-
             try {
                 const response = await fetch(`/${urlCode}/revaluate`, { method: 'POST' });
                 const result = await response.json();
-
                 if (result.success) {
                     showSubmittedState(result.file_count);
                 } else {
@@ -577,7 +576,6 @@
             try {
                 const response = await fetch(`/${urlCode}/status`);
                 const status = await response.json();
-
                 if (status.status === 'processing') {
                     setTimeout(pollStatus, 3000);
                 } else if (status.status === 'complete') {
@@ -606,7 +604,7 @@
                             <div class="st-empty-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             </div>
-                            <p>No files uploaded yet. Tick your insurers on the left, follow the guide, then drop each file in its box.</p>
+                            <p>No files uploaded yet. Select your insurers above, follow each guide, then drop the file onto its panel.</p>
                         </div>
                     `;
                     const btn = document.getElementById('revaluate-btn');
@@ -641,7 +639,6 @@
                     fileList.appendChild(div);
                 }
 
-                // Show/create revaluate button
                 let btn = document.getElementById('revaluate-btn');
                 if (!btn && data.files.length > 0) {
                     const container = fileList.parentElement;
@@ -668,7 +665,6 @@
             if (!items || items.length === 0) return;
             const card = document.getElementById('summary-card');
             const content = document.getElementById('summary-content');
-
             content.innerHTML = items.map(item => {
                 let cls = 'st-summary-item';
                 if (item.includes('✓') || item.startsWith('Good') || item.startsWith('Found')) cls += ' positive';
@@ -676,7 +672,6 @@
                 else if (item.includes('ℹ') || item.includes('🔒')) cls += ' info';
                 return `<div class="${cls}">${item}</div>`;
             }).join('');
-
             card.style.display = 'block';
             card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -700,7 +695,6 @@
                 const insurer = pendingInsurer;
                 const queue = pendingQueue;
                 hideConfirmModal();
-
                 if (fileId) {
                     uploadFile(file, 'replace', fileId, insurer, () => {
                         if (queue) processFileQueue(queue.files, queue.nextIndex, queue.insurer);

@@ -183,14 +183,14 @@ h1, h2, h3, h4, h5, h6 {
 /* --- App Layout (Sidebar + Main) --- */
 .st-app-layout {
     display: grid;
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: 1fr;
     min-height: calc(100vh - 60px);
 }
 
-@media (max-width: 1024px) {
-    .st-app-layout {
-        grid-template-columns: 1fr;
-    }
+.st-main-wide {
+    max-width: 960px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 
@@ -1269,36 +1269,77 @@ h1, h2, h3, h4, h5, h6 {
 .gap-2 { gap: 1rem; }
 
 
-/* --- Insurer picker checkboxes (sidebar) --- */
-.st-insurer-check-row {
+/* --- Insurer selection tile grid --- */
+.st-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.st-tile {
+    position: relative;
+    border: 2px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    transition: var(--transition-fast);
+}
+
+/* Selected tiles cluster at the front of the grid and stay full colour. */
+.st-tile[data-selected="true"] {
+    order: 0;
+    border-color: var(--primary);
+    background: var(--brand-green-light);
+    box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+/* Unselected tiles follow and grey out. */
+.st-tile[data-selected="false"] {
+    order: 1;
+    filter: grayscale(1);
+    opacity: 0.6;
+}
+
+.st-tile[data-selected="false"]:hover {
+    filter: grayscale(0.4);
+    opacity: 0.9;
+    border-color: var(--brand-green-mid);
+}
+
+.st-tile-body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    padding: 0.75rem 1.25rem;
+    padding: 0.9rem 2.1rem 0.9rem 1rem;
+    text-align: left;
+}
+
+.st-tile-name {
+    flex: 1;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.st-tile-checkbox {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    accent-color: var(--primary);
     cursor: pointer;
-    transition: var(--transition-fast);
+    z-index: 2;
     margin: 0;
 }
 
-.st-insurer-check-row:hover {
-    background: var(--bg-hover);
+.st-tile-checkbox:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
 }
 
-.st-insurer-check {
-    width: 18px;
-    height: 18px;
-    accent-color: var(--primary);
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.st-insurer-check-row:has(.st-insurer-check:checked) {
-    background: var(--bg-green-tint);
-    border-left: 3px solid var(--primary);
-    padding-left: calc(1.25rem - 3px);
-}
-
-/* --- Per-insurer guided flow panels (main area) --- */
+/* --- Per-insurer guided flow panels (full-panel drop targets) --- */
 .st-flows-empty {
     font-size: var(--font-size-sm);
     color: var(--text-muted);
@@ -1306,16 +1347,24 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .st-insurer-flow {
-    border: 1px solid var(--border-light);
-    border-left: 3px solid var(--primary);
+    position: relative;
+    border: 2px dashed var(--border-medium);
+    border-left: 4px solid var(--primary);
     border-radius: var(--radius-md);
     padding: 1.25rem;
     margin-top: 1rem;
     background: var(--bg-green-tint);
+    transition: var(--transition-fast);
 }
 
 .st-insurer-flow[hidden] {
     display: none;
+}
+
+.st-insurer-flow.drag-active {
+    border-color: var(--primary);
+    border-style: solid;
+    box-shadow: 0 0 0 4px rgba(45, 122, 74, 0.18);
 }
 
 .st-flow-header {
@@ -1329,6 +1378,45 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
     font-size: var(--font-size-md);
     color: var(--text-primary);
+}
+
+/* Drag overlay covering the whole panel */
+.st-flow-dropoverlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: rgba(232, 245, 233, 0.96);
+    border-radius: var(--radius-md);
+    z-index: 5;
+    pointer-events: none;
+    text-align: center;
+    padding: 1rem;
+}
+
+.st-insurer-flow.drag-active .st-flow-dropoverlay {
+    display: flex;
+}
+
+.st-flow-dropoverlay-icon {
+    width: 48px;
+    height: 48px;
+    color: var(--primary);
+}
+
+.st-flow-dropoverlay-text {
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--brand-green-dark);
+}
+
+.st-insurer-link {
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
 }
 
 .st-insurer-link-disabled {
@@ -1348,11 +1436,33 @@ h1, h2, h3, h4, h5, h6 {
     font-style: italic;
 }
 
-.st-insurer-dropzone {
+.st-flow-browse {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     margin-top: 1rem;
-    margin-bottom: 0;
-    padding: 1.75rem 1.5rem;
+    padding: 0.5rem 1rem;
     background: var(--bg-card);
+    border: 1px solid var(--border-dark);
+    border-radius: var(--radius-pill);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: inherit;
+}
+
+.st-flow-browse:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.st-flow-drophint {
+    display: block;
+    margin-top: 0.75rem;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
 }
 
 .st-file-insurer-badge {
