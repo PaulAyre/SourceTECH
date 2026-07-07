@@ -37,6 +37,23 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Insurers this adviser uses (optional)</label>
+                        <div class="form-text mb-2">Pre-tick the insurers you know this adviser holds. They come pre-checked on the adviser's upload page, and the adviser can still add or remove insurers.</div>
+                        <div class="row g-2">
+                            {% for ins in insurers %}
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="insurers"
+                                           value="{{ ins.key }}" id="ins_{{ ins.key }}"
+                                           {% if ins.key in selected_insurers %}checked{% endif %}>
+                                    <label class="form-check-label" for="ins_{{ ins.key }}">{{ ins.name }}</label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="notes" class="form-label">Notes (optional)</label>
                         <textarea class="form-control" id="notes" name="notes" rows="3"
                                   placeholder="e.g., Referred by Mike. Expecting ~500 policies.">{{ form.notes if form else '' }}</textarea>

@@ -1267,3 +1267,102 @@ h1, h2, h3, h4, h5, h6 {
 .flex-center { display: flex; align-items: center; justify-content: center; }
 .gap-1 { gap: 0.5rem; }
 .gap-2 { gap: 1rem; }
+
+
+/* --- Insurer picker checkboxes (sidebar) --- */
+.st-insurer-check-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    margin: 0;
+}
+
+.st-insurer-check-row:hover {
+    background: var(--bg-hover);
+}
+
+.st-insurer-check {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.st-insurer-check-row:has(.st-insurer-check:checked) {
+    background: var(--bg-green-tint);
+    border-left: 3px solid var(--primary);
+    padding-left: calc(1.25rem - 3px);
+}
+
+/* --- Per-insurer guided flow panels (main area) --- */
+.st-flows-empty {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.st-insurer-flow {
+    border: 1px solid var(--border-light);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+    margin-top: 1rem;
+    background: var(--bg-green-tint);
+}
+
+.st-insurer-flow[hidden] {
+    display: none;
+}
+
+.st-flow-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.st-flow-name {
+    font-weight: 700;
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+}
+
+.st-insurer-link-disabled {
+    background: var(--bg-muted) !important;
+    color: var(--text-muted) !important;
+    cursor: not-allowed;
+    box-shadow: none !important;
+    transform: none !important;
+    opacity: 0.7;
+}
+
+.st-portal-tbc {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.st-insurer-dropzone {
+    margin-top: 1rem;
+    margin-bottom: 0;
+    padding: 1.75rem 1.5rem;
+    background: var(--bg-card);
+}
+
+.st-file-insurer-badge {
+    display: inline-block;
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.5rem;
+    background: var(--brand-green-light);
+    color: var(--primary);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    vertical-align: middle;
+}

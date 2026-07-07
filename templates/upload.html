@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.0</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.0" rel="stylesheet">
+    <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='iplogo_with_frame_PNG.png') }}" type="image/png">
 </head>
 <body>
@@ -19,21 +19,21 @@
         </a>
         <div class="st-header-right">
             <span class="st-header-badge">Secure Upload</span>
-            <span class="st-header-version">v2.0</span>
+            <span class="st-header-version">v2.1</span>
         </div>
     </header>
 
     <!-- App Layout -->
     <div class="st-app-layout">
 
-        <!-- LEFT SIDEBAR: Insurer Guide -->
+        <!-- LEFT SIDEBAR: Insurer picker -->
         <aside class="st-sidebar" id="sidebar">
             <div class="st-sidebar-header">
                 <h2 class="st-sidebar-title">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                    Download Guide
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Select your insurers
                 </h2>
-                <p class="st-sidebar-subtitle">How to get your in-force data from each insurer</p>
+                <p class="st-sidebar-subtitle">Tick each insurer you hold. We will show you exactly how to download that insurer's data and where to drop it.</p>
             </div>
 
             <div class="st-sidebar-search">
@@ -41,244 +41,16 @@
             </div>
 
             <div class="st-insurer-list" id="insurer-list">
-
-                <!-- AIA Australia -->
-                <div class="st-insurer-item" data-insurer="aia australia">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #c8102e;">AIA</span>
-                        <span class="st-insurer-name">AIA Australia</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to <strong>AIA Adviser Portal</strong></li>
-                            <li>From the left menu, click <strong>Policies</strong></li>
-                            <li>Select <strong>In-force</strong> to view active policies</li>
-                            <li>Click <strong>Export</strong> to download as Excel/CSV</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://myaia.aia.com.au/en/login" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open AIA Portal
-                        </a>
-                        <div class="st-insurer-format">Formats: XLS, CSV, PDF</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            Requires an AIA Adviser Code. Contact au.retailadviseradmin@aia.com if you need one.
-                        </div>
-                    </div>
+                {% for ins in insurers %}
+                <div class="st-insurer-item" data-insurer="{{ ins.search }}">
+                    <label class="st-insurer-check-row">
+                        <input type="checkbox" class="st-insurer-check" data-key="{{ ins.key }}"
+                               {% if ins.key in selected_insurers %}checked{% endif %}>
+                        <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
+                        <span class="st-insurer-name">{{ ins.name }}</span>
+                    </label>
                 </div>
-
-                <!-- TAL -->
-                <div class="st-insurer-item" data-insurer="tal tower asteron">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #003087;">TAL</span>
-                        <span class="st-insurer-name">TAL (incl. Asteron)</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to <strong>TAL Adviser Centre</strong></li>
-                            <li>Navigate to <strong>Inforce Management</strong></li>
-                            <li>View your in-force dashboard with all active policies</li>
-                            <li>Use <strong>Secure File Transfer</strong> to export data, or ask your TAL BDM for a data extract</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://adviser.tal.com.au/" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open TAL Adviser Centre
-                        </a>
-                        <div class="st-insurer-format">Formats: Dashboard view, Secure File Transfer</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            Asteron Life policies are now managed through TAL Adviser Centre since 2021.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Zurich / OnePath -->
-                <div class="st-insurer-item" data-insurer="zurich onepath">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #003399;">ZUR</span>
-                        <span class="st-insurer-name">Zurich / OnePath</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to <strong>The Adviser Portal</strong> (combined Zurich + OnePath view)</li>
-                            <li>Navigate to <strong>Portfolio Insights</strong></li>
-                            <li>View your in-force book by policies, premium, and sum insured</li>
-                            <li>Export policy data to PDF or request a data extract from your BDM</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://advisers.zurich.com.au/resources/adviser-portal" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open Zurich Portal
-                        </a>
-                        <div class="st-insurer-format">Formats: PDF, Portfolio reports</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            OnePath life insurance is now fully integrated under Zurich. MFA required.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MLC / Acenda -->
-                <div class="st-insurer-item" data-insurer="mlc acenda nippon">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #e31837;">MLC</span>
-                        <span class="st-insurer-name">MLC Life (Acenda)</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to <strong>Acenda Adviser Portal</strong></li>
-                            <li>Choose <strong>Adviser login</strong> (top right)</li>
-                            <li>Go to the <strong>Reporting tab</strong> to generate a client report</li>
-                            <li>Download the report</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://partner.acenda.com.au" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open Acenda Portal
-                        </a>
-                        <div class="st-insurer-format">Formats: Client reports</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            MLC Limited is now Acenda (formerly Nippon Life Insurance AU/NZ). Your username starts with C or a number (not your Adviser Code).
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MetLife -->
-                <div class="st-insurer-item" data-insurer="metlife">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #00a94f;">MET</span>
-                        <span class="st-insurer-name">MetLife Australia</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to the <strong>MetLife Adviser Portal</strong></li>
-                            <li>Navigate to your <strong>client portfolio</strong> section</li>
-                            <li>Generate and download your in-force report</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://www.metlife.com.au/login/" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open MetLife Portal
-                        </a>
-                        <div class="st-insurer-format">Formats: Contact BDM for export</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            Need an adviser code? Visit metlife.com.au/adviser-partnerships/get-an-adviser-code
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ClearView -->
-                <div class="st-insurer-item" data-insurer="clearview">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #0077c8;">CLV</span>
-                        <span class="st-insurer-name">ClearView</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to the <strong>ClearView Adviser Portal</strong></li>
-                            <li>Access reporting for ClearChoice and LifeSolutions products</li>
-                            <li>Generate your in-force report from the reporting section</li>
-                            <li>Download as Excel or CSV</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://adviserportal.clearview.com.au/Profile/Login" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open ClearView Portal
-                        </a>
-                        <div class="st-insurer-format">Formats: PDF, Excel, CSV (via SSRS)</div>
-                    </div>
-                </div>
-
-                <!-- Resolution Life -->
-                <div class="st-insurer-item" data-insurer="resolution life amp">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #5c2d91;">RES</span>
-                        <span class="st-insurer-name">Resolution Life (ex-AMP)</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to <strong>My Resolution Life</strong></li>
-                            <li>View dashboard with Renewal &amp; Overdue notices</li>
-                            <li>Select <strong>View &gt; Statements and correspondence</strong></li>
-                            <li>Select the relevant product and download documents</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://advisor.resolutionlife.com.au/CentralPortalsLogin/NewLoginRLANZ" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open Resolution Life
-                        </a>
-                        <div class="st-insurer-format">Formats: Statements (PDF)</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            Now part of Acenda Group. The old AMP Planner Portal no longer works for Resolution Life products. MFA is enforced.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BT Financial Group -->
-                <div class="st-insurer-item" data-insurer="bt westpac financial group panorama">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #d5002b;">BT</span>
-                        <span class="st-insurer-name">BT Financial Group</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to <strong>BT Panorama</strong> adviser site</li>
-                            <li>Navigate to the <strong>Reporting</strong> section</li>
-                            <li>Generate your in-force insurance policy report</li>
-                            <li>Download the report</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://www.panoramaadviser.com.au" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open BT Panorama
-                        </a>
-                        <div class="st-insurer-format">Formats: Xplan integration, platform reports</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            BT insurance admin has transferred to Australian Group Insurances (AGI) since Aug 2025.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- NobleOak / NEOS -->
-                <div class="st-insurer-item" data-insurer="nobleoak neos futura">
-                    <button class="st-insurer-header" aria-expanded="false" onclick="toggleInsurer(this)">
-                        <span class="st-insurer-icon" style="background: #2e5090;">NEO</span>
-                        <span class="st-insurer-name">NobleOak / NEOS</span>
-                        <svg class="st-insurer-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-                    </button>
-                    <div class="st-insurer-panel">
-                        <ol class="st-insurer-steps">
-                            <li>Log in to the <strong>NEOS Adviser Portal</strong></li>
-                            <li>View your integrated dashboard of all plans</li>
-                            <li>Export your in-force policy data</li>
-                            <li>Drag the downloaded file into the upload area</li>
-                        </ol>
-                        <a href="https://portal.neoslife.com.au/" target="_blank" rel="noopener" class="st-insurer-link">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                            Open NEOS Portal
-                        </a>
-                        <div class="st-insurer-format">Formats: Contact adviser services</div>
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            NobleOak advised channel operates through NEOS / Futura Protection platforms.
-                        </div>
-                    </div>
-                </div>
-
+                {% endfor %}
             </div><!-- /insurer-list -->
         </aside>
 
@@ -288,23 +60,86 @@
             <!-- Welcome Card -->
             <div class="st-card st-welcome">
                 <h1>Welcome, {{ vendor.vendor_name }}</h1>
-                <p>Upload your portfolio files below. You can add multiple files and we'll combine them for valuation.</p>
+                <p>Tick the insurers you hold on the left. For each one you will get a step-by-step download guide, a button to open that insurer's portal, and a labelled box to drop the file into. We combine everything for your valuation.</p>
             </div>
 
             <!-- Chrome drag tip -->
             <div class="st-drag-tip">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span><strong>Tip:</strong> Using Chrome? Open your insurer portal in one tab, download the file, then drag it straight from Chrome's download bar into the box below.</span>
+                <span><strong>Tip:</strong> Using Chrome? Open an insurer portal in one tab, download the file, then drag it straight from Chrome's download bar into that insurer's box below.</span>
             </div>
 
-            <!-- Upload Card -->
+            <!-- Per-insurer guided flows -->
+            <div class="st-card" id="insurer-flows-card">
+                <div class="st-card-header">
+                    <h2 class="st-card-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        Your insurers
+                    </h2>
+                </div>
+
+                <p class="st-flows-empty" id="flows-empty">
+                    No insurers selected yet. Tick the insurers you hold in the list on the left (or use the box below to upload a file directly).
+                </p>
+
+                {% for ins in insurers %}
+                <div class="st-insurer-flow" data-key="{{ ins.key }}" {% if ins.key not in selected_insurers %}hidden{% endif %}>
+                    <div class="st-flow-header">
+                        <span class="st-insurer-icon" style="background: {{ ins.color }};">{{ ins.badge }}</span>
+                        <span class="st-flow-name">{{ ins.name }}</span>
+                    </div>
+
+                    {% if ins.portal_url %}
+                    <a href="{{ ins.portal_url }}" target="_blank" rel="noopener" class="st-insurer-link">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        Open {{ ins.name }} portal
+                    </a>
+                    {% else %}
+                    <span class="st-insurer-link st-insurer-link-disabled" aria-disabled="true" title="Portal link not yet available">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        Open {{ ins.name }} portal
+                    </span>
+                    <span class="st-portal-tbc">portal link TBC</span>
+                    {% endif %}
+
+                    <ol class="st-insurer-steps">
+                        {% for step in ins.steps %}
+                        <li>{{ step|safe }}</li>
+                        {% endfor %}
+                    </ol>
+
+                    {% if ins.format %}<div class="st-insurer-format">{{ ins.format }}</div>{% endif %}
+
+                    {% if ins.hint %}
+                    <div class="st-insurer-hint">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        {{ ins.hint }}
+                    </div>
+                    {% endif %}
+
+                    <!-- Per-insurer dropzone -->
+                    <div class="st-dropzone st-insurer-dropzone" data-key="{{ ins.key }}" role="button" tabindex="0" aria-label="Upload {{ ins.name }} file">
+                        <div class="st-dropzone-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        </div>
+                        <div class="st-dropzone-text">Drop {{ ins.name }} file here</div>
+                        <div class="st-dropzone-hint">or click to browse for the {{ ins.name }} download</div>
+                        <div class="st-dropzone-formats">Accepts .xlsx, .xls, and .csv files</div>
+                        <input type="file" class="st-insurer-file-input" accept=".xlsx,.xls,.csv" data-key="{{ ins.key }}" hidden>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- General / other upload card (no specific insurer) -->
             <div class="st-card">
                 <div class="st-card-header">
                     <h2 class="st-card-title">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        Upload Files
+                        Other files
                     </h2>
                 </div>
+                <p class="st-flows-empty" style="margin-bottom:1rem;">Have a file that is not from one of the insurers above, or not sure which one it is? Drop it here.</p>
 
                 <!-- Dropzone -->
                 <div class="st-dropzone" id="dropzone" role="button" tabindex="0" aria-label="Upload files by clicking or dragging files here">
@@ -364,7 +199,10 @@
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             </div>
                             <div class="st-file-info">
-                                <div class="st-file-name">{{ file.original_filename }}</div>
+                                <div class="st-file-name">
+                                    {{ file.original_filename }}
+                                    {% if file.insurer_name %}<span class="st-file-insurer-badge">{{ file.insurer_name }}</span>{% endif %}
+                                </div>
                                 <div class="st-file-meta">
                                     {{ file.policy_count or 0 }} policies
                                     {% if file.status == 'warning' %} &bull; Has warnings{% endif %}
@@ -383,7 +221,7 @@
                             <div class="st-empty-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             </div>
-                            <p>No files uploaded yet. Use the insurer guide on the left to download your data, then drop it above.</p>
+                            <p>No files uploaded yet. Tick your insurers on the left, follow the guide, then drop each file in its box.</p>
                         </div>
                     {% endif %}
                 </div>
@@ -432,8 +270,8 @@
     </div><!-- /app-layout -->
 
     <!-- Sidebar toggle (mobile) -->
-    <button class="st-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle insurer guide">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    <button class="st-sidebar-toggle" id="sidebar-toggle" aria-label="Toggle insurer picker">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </button>
     <div class="st-sidebar-overlay" id="sidebar-overlay"></div>
 
@@ -455,30 +293,45 @@
 
     <script>
         const urlCode = '{{ url_code }}';
+        // Build a key -> name map for badge labels on refreshed file rows.
+        const INSURER_NAME_MAP = {
+            {% for ins in insurers %}'{{ ins.key }}': {{ ins.name|tojson }},{% endfor %}
+        };
         let pendingFile = null;
         let pendingMatch = null;
+        let pendingInsurer = '';
 
-        // ── Sidebar accordion ──────────────────────────────────
-        function toggleInsurer(btn) {
-            const expanded = btn.getAttribute('aria-expanded') === 'true';
-            const panel = btn.nextElementSibling;
-
-            // Close all other panels
-            document.querySelectorAll('.st-insurer-header[aria-expanded="true"]').forEach(other => {
-                if (other !== btn) {
-                    other.setAttribute('aria-expanded', 'false');
-                    other.nextElementSibling.classList.remove('open');
-                }
-            });
-
-            btn.setAttribute('aria-expanded', !expanded);
-            panel.classList.toggle('open', !expanded);
+        // ── Sidebar: insurer checkboxes reveal per-insurer panels ──
+        function panelFor(key) {
+            return document.querySelector(`.st-insurer-flow[data-key="${key}"]`);
         }
 
-        // Insurer search filter
+        function updateFlowsEmpty() {
+            const anyVisible = document.querySelector('.st-insurer-flow:not([hidden])');
+            const empty = document.getElementById('flows-empty');
+            if (empty) empty.style.display = anyVisible ? 'none' : '';
+        }
+
+        document.querySelectorAll('.st-insurer-check').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const key = cb.dataset.key;
+                const panel = panelFor(key);
+                if (!panel) return;
+                if (cb.checked) {
+                    panel.hidden = false;
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    panel.hidden = true;
+                }
+                updateFlowsEmpty();
+            });
+        });
+        updateFlowsEmpty();
+
+        // Insurer search filter (filters the checkbox list)
         document.getElementById('insurer-search').addEventListener('input', function() {
             const query = this.value.toLowerCase();
-            document.querySelectorAll('.st-insurer-item').forEach(item => {
+            document.querySelectorAll('#insurer-list .st-insurer-item').forEach(item => {
                 const name = item.getAttribute('data-insurer') || '';
                 const text = item.textContent.toLowerCase();
                 item.style.display = (name.includes(query) || text.includes(query)) ? '' : 'none';
@@ -500,49 +353,52 @@
             sidebarOverlay.classList.remove('visible');
         });
 
-        // ── Dropzone handling ──────────────────────────────────
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('file-input');
-
-        dropzone.addEventListener('click', () => fileInput.click());
-
-        dropzone.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+        // ── Dropzone wiring ────────────────────────────────────
+        function wireDropzone(dz, input, insurer) {
+            dz.addEventListener('click', (e) => {
+                if (e.target === input) return;
+                input.click();
+            });
+            dz.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    input.click();
+                }
+            });
+            dz.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                fileInput.click();
-            }
-        });
+                dz.classList.add('drag-over');
+            });
+            dz.addEventListener('dragleave', (e) => {
+                if (!dz.contains(e.relatedTarget)) dz.classList.remove('drag-over');
+            });
+            dz.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dz.classList.remove('drag-over');
+                handleFiles(e.dataTransfer.files, insurer);
+            });
+            input.addEventListener('change', (e) => {
+                handleFiles(e.target.files, insurer);
+                input.value = '';
+            });
+        }
 
-        dropzone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropzone.classList.add('drag-over');
-        });
+        // General dropzone (no insurer tag)
+        wireDropzone(document.getElementById('dropzone'), document.getElementById('file-input'), '');
 
-        dropzone.addEventListener('dragleave', (e) => {
-            // Only remove if leaving the dropzone itself
-            if (!dropzone.contains(e.relatedTarget)) {
-                dropzone.classList.remove('drag-over');
-            }
-        });
-
-        dropzone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropzone.classList.remove('drag-over');
-            handleFiles(e.dataTransfer.files);
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-            fileInput.value = '';
+        // Per-insurer dropzones (tag each upload with its insurer key)
+        document.querySelectorAll('.st-insurer-dropzone').forEach(dz => {
+            const key = dz.dataset.key;
+            const input = dz.querySelector('.st-insurer-file-input');
+            wireDropzone(dz, input, key);
         });
 
         // ── Smart file handling with duplicate detection ───────
         function normalizeFilename(name) {
-            // Remove common download suffixes: (1), (2), (3), _1, _2, etc.
             return name
-                .replace(/\s*\(\d+\)\s*(?=\.\w+$)/, '')   // "file (1).xlsx" -> "file.xlsx"
-                .replace(/_\d+(?=\.\w+$)/, '')              // "file_1.xlsx" -> "file.xlsx"
-                .replace(/ copy\s*\d*/i, '')                 // "file copy.xlsx" -> "file.xlsx"
+                .replace(/\s*\(\d+\)\s*(?=\.\w+$)/, '')
+                .replace(/_\d+(?=\.\w+$)/, '')
+                .replace(/ copy\s*\d*/i, '')
                 .toLowerCase()
                 .trim();
         }
@@ -552,68 +408,61 @@
             const fileItems = document.querySelectorAll('.st-file-item[data-file-id]');
 
             for (const item of fileItems) {
-                const existingName = item.querySelector('.st-file-name')?.textContent || '';
+                const nameEl = item.querySelector('.st-file-name');
+                const existingName = nameEl ? (nameEl.childNodes[0]?.textContent || nameEl.textContent).trim() : '';
                 if (normalizeFilename(existingName) === normalized) {
-                    return {
-                        id: item.dataset.fileId,
-                        name: existingName
-                    };
+                    return { id: item.dataset.fileId, name: existingName };
                 }
             }
             return null;
         }
 
-        function handleFiles(files) {
-            // Process files sequentially to allow per-file duplicate prompts
-            processFileQueue(Array.from(files), 0);
+        let pendingQueue = null;
+
+        function handleFiles(files, insurer = '') {
+            processFileQueue(Array.from(files), 0, insurer);
         }
 
-        function processFileQueue(files, index) {
+        function processFileQueue(files, index, insurer = '') {
             if (index >= files.length) return;
 
             const file = files[index];
             const duplicate = findDuplicateFile(file.name);
 
             if (duplicate) {
-                // Show modal for this file
                 pendingFile = file;
+                pendingInsurer = insurer;
                 pendingMatch = {
                     filename: duplicate.name,
                     fileId: duplicate.id,
                     similarity: 100,
                     message: `"${file.name}" looks like an updated version of "${duplicate.name}". Replace the old one?`
                 };
-                pendingQueue = { files, nextIndex: index + 1 };
+                pendingQueue = { files, nextIndex: index + 1, insurer };
                 showConfirmModal(pendingMatch);
             } else {
-                uploadFile(file, 'auto', null, () => {
-                    processFileQueue(files, index + 1);
+                uploadFile(file, 'auto', null, insurer, () => {
+                    processFileQueue(files, index + 1, insurer);
                 });
             }
         }
 
-        let pendingQueue = null;
-
-        async function uploadFile(file, action = 'auto', replaceFileId = null, onComplete = null) {
+        async function uploadFile(file, action = 'auto', replaceFileId = null, insurer = '', onComplete = null) {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('action', action);
-            if (replaceFileId) {
-                formData.append('replace_file_id', replaceFileId);
-            }
+            if (replaceFileId) formData.append('replace_file_id', replaceFileId);
+            if (insurer) formData.append('insurer', insurer);
 
-            addUploadingFile(file.name);
+            addUploadingFile(file.name, insurer);
 
             try {
-                const response = await fetch(`/${urlCode}/upload`, {
-                    method: 'POST',
-                    body: formData
-                });
-
+                const response = await fetch(`/${urlCode}/upload`, { method: 'POST', body: formData });
                 const result = await response.json();
 
                 if (result.needs_confirmation) {
                     pendingFile = file;
+                    pendingInsurer = insurer;
                     pendingMatch = result.match;
                     showConfirmModal(result.match);
                     removeUploadingFile(file.name);
@@ -636,10 +485,13 @@
             if (onComplete) onComplete();
         }
 
-        function addUploadingFile(filename) {
+        function addUploadingFile(filename, insurer = '') {
             const fileList = document.getElementById('file-list');
             const emptyState = fileList.querySelector('.st-empty');
             if (emptyState) emptyState.remove();
+
+            const badge = insurer && INSURER_NAME_MAP[insurer]
+                ? ` <span class="st-file-insurer-badge">${INSURER_NAME_MAP[insurer]}</span>` : '';
 
             const div = document.createElement('div');
             div.className = 'st-file-item uploading';
@@ -649,7 +501,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 </div>
                 <div class="st-file-info">
-                    <div class="st-file-name">${filename}</div>
+                    <div class="st-file-name">${filename}${badge}</div>
                     <div class="st-file-meta">Uploading and processing...</div>
                 </div>
             `;
@@ -754,7 +606,7 @@
                             <div class="st-empty-icon">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                             </div>
-                            <p>No files uploaded yet. Use the insurer guide on the left to download your data, then drop it above.</p>
+                            <p>No files uploaded yet. Tick your insurers on the left, follow the guide, then drop each file in its box.</p>
                         </div>
                     `;
                     const btn = document.getElementById('revaluate-btn');
@@ -768,10 +620,12 @@
                     const div = document.createElement('div');
                     div.className = `st-file-item ${file.status === 'warning' ? 'warning' : ''}`;
                     div.dataset.fileId = file.id;
+                    const badge = file.insurer_name
+                        ? ` <span class="st-file-insurer-badge">${file.insurer_name}</span>` : '';
                     div.innerHTML = `
                         <div class="st-file-icon">${fileIconSvg}</div>
                         <div class="st-file-info">
-                            <div class="st-file-name">${file.original_filename}</div>
+                            <div class="st-file-name">${file.original_filename}${badge}</div>
                             <div class="st-file-meta">
                                 ${file.policy_count || 0} policies
                                 ${file.status === 'warning' ? ' &bull; Has warnings' : ''}
@@ -817,9 +671,9 @@
 
             content.innerHTML = items.map(item => {
                 let cls = 'st-summary-item';
-                if (item.includes('\u2713') || item.startsWith('Good') || item.startsWith('Found')) cls += ' positive';
-                else if (item.includes('\u26a0') || item.includes('warning')) cls += ' warning';
-                else if (item.includes('\u2139') || item.includes('\ud83d\udd12')) cls += ' info';
+                if (item.includes('✓') || item.startsWith('Good') || item.startsWith('Found')) cls += ' positive';
+                else if (item.includes('⚠') || item.includes('warning')) cls += ' warning';
+                else if (item.includes('ℹ') || item.includes('🔒')) cls += ' info';
                 return `<div class="${cls}">${item}</div>`;
             }).join('');
 
@@ -843,20 +697,20 @@
             if (pendingFile && pendingMatch) {
                 const file = pendingFile;
                 const fileId = pendingMatch.fileId;
+                const insurer = pendingInsurer;
                 const queue = pendingQueue;
                 hideConfirmModal();
 
                 if (fileId) {
-                    uploadFile(file, 'replace', fileId, () => {
-                        if (queue) processFileQueue(queue.files, queue.nextIndex);
+                    uploadFile(file, 'replace', fileId, insurer, () => {
+                        if (queue) processFileQueue(queue.files, queue.nextIndex, queue.insurer);
                     });
                 } else {
-                    // Server-side match: look up file ID
                     const response = await fetch(`/${urlCode}/files`);
                     const data = await response.json();
                     const existingFile = data.files.find(f => f.original_filename === pendingMatch.filename);
-                    uploadFile(file, 'replace', existingFile ? existingFile.id : null, () => {
-                        if (queue) processFileQueue(queue.files, queue.nextIndex);
+                    uploadFile(file, 'replace', existingFile ? existingFile.id : null, insurer, () => {
+                        if (queue) processFileQueue(queue.files, queue.nextIndex, queue.insurer);
                     });
                 }
             }
@@ -865,10 +719,11 @@
         document.getElementById('btn-add-new').addEventListener('click', () => {
             if (pendingFile) {
                 const file = pendingFile;
+                const insurer = pendingInsurer;
                 const queue = pendingQueue;
                 hideConfirmModal();
-                uploadFile(file, 'add_new', null, () => {
-                    if (queue) processFileQueue(queue.files, queue.nextIndex);
+                uploadFile(file, 'add_new', null, insurer, () => {
+                    if (queue) processFileQueue(queue.files, queue.nextIndex, queue.insurer);
                 });
             }
         });
@@ -876,7 +731,7 @@
         document.getElementById('btn-cancel').addEventListener('click', () => {
             const queue = pendingQueue;
             hideConfirmModal();
-            if (queue) processFileQueue(queue.files, queue.nextIndex);
+            if (queue) processFileQueue(queue.files, queue.nextIndex, queue.insurer);
         });
 
         // ── Toast ──────────────────────────────────────────────

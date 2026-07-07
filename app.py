@@ -50,6 +50,163 @@ Path(TEMP_DIR).mkdir(parents=True, exist_ok=True)
 pavtech = PavTechClient(PAVTECH_API_URL, temp_dir=TEMP_DIR)
 
 
+# ─────────────────────────────────────────────────────────────
+# INSURER CATALOGUE (single source of truth)
+# Extracted verbatim from the vendor upload page's Download Guide sidebar.
+# Drives: the adviser upload page (checkboxes + per-insurer panels), the admin
+# pre-selection checkboxes, and validation of insurer tags coming back on upload
+# and via the DealTECH bridge. If an insurer's portal_url is empty, the UI renders
+# a disabled "portal link TBC" button rather than a broken/fabricated link.
+# ─────────────────────────────────────────────────────────────
+INSURERS = [
+    {
+        "key": "aia", "name": "AIA Australia", "badge": "AIA", "color": "#c8102e",
+        "search": "aia australia",
+        "portal_url": "https://myaia.aia.com.au/en/login",
+        "steps": [
+            "Log in to <strong>AIA Adviser Portal</strong>",
+            "From the left menu, click <strong>Policies</strong>",
+            "Select <strong>In-force</strong> to view active policies",
+            "Click <strong>Export</strong> to download as Excel/CSV",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: XLS, CSV, PDF",
+        "hint": "Requires an AIA Adviser Code. Contact au.retailadviseradmin@aia.com if you need one.",
+    },
+    {
+        "key": "tal", "name": "TAL (incl. Asteron)", "badge": "TAL", "color": "#003087",
+        "search": "tal tower asteron",
+        "portal_url": "https://adviser.tal.com.au/",
+        "steps": [
+            "Log in to <strong>TAL Adviser Centre</strong>",
+            "Navigate to <strong>Inforce Management</strong>",
+            "View your in-force dashboard with all active policies",
+            "Use <strong>Secure File Transfer</strong> to export data, or ask your TAL BDM for a data extract",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Dashboard view, Secure File Transfer",
+        "hint": "Asteron Life policies are now managed through TAL Adviser Centre since 2021.",
+    },
+    {
+        "key": "zurich", "name": "Zurich / OnePath", "badge": "ZUR", "color": "#003399",
+        "search": "zurich onepath",
+        "portal_url": "https://advisers.zurich.com.au/resources/adviser-portal",
+        "steps": [
+            "Log in to <strong>The Adviser Portal</strong> (combined Zurich + OnePath view)",
+            "Navigate to <strong>Portfolio Insights</strong>",
+            "View your in-force book by policies, premium, and sum insured",
+            "Export policy data to PDF or request a data extract from your BDM",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: PDF, Portfolio reports",
+        "hint": "OnePath life insurance is now fully integrated under Zurich. MFA required.",
+    },
+    {
+        "key": "mlc", "name": "MLC Life (Acenda)", "badge": "MLC", "color": "#e31837",
+        "search": "mlc acenda nippon",
+        "portal_url": "https://partner.acenda.com.au",
+        "steps": [
+            "Log in to <strong>Acenda Adviser Portal</strong>",
+            "Choose <strong>Adviser login</strong> (top right)",
+            "Go to the <strong>Reporting tab</strong> to generate a client report",
+            "Download the report",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Client reports",
+        "hint": "MLC Limited is now Acenda (formerly Nippon Life Insurance AU/NZ). Your username starts with C or a number (not your Adviser Code).",
+    },
+    {
+        "key": "metlife", "name": "MetLife Australia", "badge": "MET", "color": "#00a94f",
+        "search": "metlife",
+        "portal_url": "https://www.metlife.com.au/login/",
+        "steps": [
+            "Log in to the <strong>MetLife Adviser Portal</strong>",
+            "Navigate to your <strong>client portfolio</strong> section",
+            "Generate and download your in-force report",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Contact BDM for export",
+        "hint": "Need an adviser code? Visit metlife.com.au/adviser-partnerships/get-an-adviser-code",
+    },
+    {
+        "key": "clearview", "name": "ClearView", "badge": "CLV", "color": "#0077c8",
+        "search": "clearview",
+        "portal_url": "https://adviserportal.clearview.com.au/Profile/Login",
+        "steps": [
+            "Log in to the <strong>ClearView Adviser Portal</strong>",
+            "Access reporting for ClearChoice and LifeSolutions products",
+            "Generate your in-force report from the reporting section",
+            "Download as Excel or CSV",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: PDF, Excel, CSV (via SSRS)",
+        "hint": "",
+    },
+    {
+        "key": "resolution", "name": "Resolution Life (ex-AMP)", "badge": "RES", "color": "#5c2d91",
+        "search": "resolution life amp",
+        "portal_url": "https://advisor.resolutionlife.com.au/CentralPortalsLogin/NewLoginRLANZ",
+        "steps": [
+            "Log in to <strong>My Resolution Life</strong>",
+            "View dashboard with Renewal &amp; Overdue notices",
+            "Select <strong>View &gt; Statements and correspondence</strong>",
+            "Select the relevant product and download documents",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Statements (PDF)",
+        "hint": "Now part of Acenda Group. The old AMP Planner Portal no longer works for Resolution Life products. MFA is enforced.",
+    },
+    {
+        "key": "bt", "name": "BT Financial Group", "badge": "BT", "color": "#d5002b",
+        "search": "bt westpac financial group panorama",
+        "portal_url": "https://www.panoramaadviser.com.au",
+        "steps": [
+            "Log in to <strong>BT Panorama</strong> adviser site",
+            "Navigate to the <strong>Reporting</strong> section",
+            "Generate your in-force insurance policy report",
+            "Download the report",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Xplan integration, platform reports",
+        "hint": "BT insurance admin has transferred to Australian Group Insurances (AGI) since Aug 2025.",
+    },
+    {
+        "key": "neos", "name": "NobleOak / NEOS", "badge": "NEO", "color": "#2e5090",
+        "search": "nobleoak neos futura",
+        "portal_url": "https://portal.neoslife.com.au/",
+        "steps": [
+            "Log in to the <strong>NEOS Adviser Portal</strong>",
+            "View your integrated dashboard of all plans",
+            "Export your in-force policy data",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Contact adviser services",
+        "hint": "NobleOak advised channel operates through NEOS / Futura Protection platforms.",
+    },
+]
+
+INSURER_KEYS = {ins["key"] for ins in INSURERS}
+INSURER_NAME_BY_KEY = {ins["key"]: ins["name"] for ins in INSURERS}
+
+
+def clean_insurer_keys(raw) -> list:
+    """Normalise + validate a list of insurer keys against the catalogue.
+
+    Accepts a list (or None). Unknown keys are dropped. Order follows the
+    catalogue so the stored/rendered order is stable. Returns a list of valid
+    keys (possibly empty), never raises on bad input.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        raw = [raw]
+    try:
+        wanted = {str(k).strip().lower() for k in raw if str(k).strip()}
+    except TypeError:
+        return []
+    return [ins["key"] for ins in INSURERS if ins["key"] in wanted]
+
+
 def get_db():
     """Get database connection with row factory."""
     db = sqlite3.connect(DATABASE)
@@ -116,11 +273,27 @@ def init_db():
     # Idempotent migration: link a vendor to its DealTECH deal (SourceTECH has no
     # migration framework, so we ALTER-if-missing). These let the DealTECH->
     # SourceTECH create API persist the deal, and the upload callback target it.
-    existing_cols = {row[1] for row in db.execute("PRAGMA table_info(vendors)").fetchall()}
-    if "deal_id" not in existing_cols:
-        db.execute("ALTER TABLE vendors ADD COLUMN deal_id INTEGER")
-    if "hubspot_deal_id" not in existing_cols:
-        db.execute("ALTER TABLE vendors ADD COLUMN hubspot_deal_id TEXT")
+    # Each ALTER is wrapped so a failure is LOGGED LOUDLY and re-raised. A
+    # migration that cannot apply must crash startup, never silently no-op.
+    def add_column_if_missing(table: str, column: str, ddl: str):
+        cols = {row[1] for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column in cols:
+            return
+        try:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+            logger.info("Migration: added %s.%s", table, column)
+        except Exception as exc:
+            logger.error("MIGRATION FAILED adding %s.%s: %s", table, column, exc)
+            raise
+
+    add_column_if_missing("vendors", "deal_id", "deal_id INTEGER")
+    add_column_if_missing("vendors", "hubspot_deal_id", "hubspot_deal_id TEXT")
+    # selected_insurers: JSON array of insurer keys the admin/DealTECH pre-ticked
+    # for this vendor. Pre-checks the adviser's page; adviser can still change it.
+    add_column_if_missing("vendors", "selected_insurers", "selected_insurers TEXT")
+    # insurer: which insurer catalogue key an uploaded file belongs to (or NULL
+    # for a plain/untagged upload). Insurer-specific downstream PavTECH parsing.
+    add_column_if_missing("vendor_files", "insurer", "insurer TEXT")
 
     db.commit()
     db.close()
@@ -223,11 +396,15 @@ def admin_create_vendor():
         dm_email = request.form.get('dm_email', '').strip()
         dm_name = request.form.get('dm_name', '').strip()
         notes = request.form.get('notes', '').strip()
+        selected = clean_insurer_keys(request.form.getlist('insurers'))
+        selected_json = json.dumps(selected)
 
         if not vendor_name or not dm_email or not dm_name:
             return render_template('admin/create_vendor.html',
                                    error='All fields are required',
-                                   form=request.form)
+                                   form=request.form,
+                                   insurers=INSURERS,
+                                   selected_insurers=selected)
 
         # Generate unique URL code
         url_code = secrets.token_urlsafe(6)[:8].upper()
@@ -235,17 +412,17 @@ def admin_create_vendor():
         db = get_db()
         try:
             db.execute('''
-                INSERT INTO vendors (url_code, vendor_name, dm_email, dm_name, created_by, notes)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (url_code, vendor_name, dm_email, dm_name, 'admin', notes))
+                INSERT INTO vendors (url_code, vendor_name, dm_email, dm_name, created_by, notes, selected_insurers)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (url_code, vendor_name, dm_email, dm_name, 'admin', notes, selected_json))
             db.commit()
         except sqlite3.IntegrityError:
             # URL code collision - try again
             url_code = secrets.token_urlsafe(6)[:8].upper()
             db.execute('''
-                INSERT INTO vendors (url_code, vendor_name, dm_email, dm_name, created_by, notes)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (url_code, vendor_name, dm_email, dm_name, 'admin', notes))
+                INSERT INTO vendors (url_code, vendor_name, dm_email, dm_name, created_by, notes, selected_insurers)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (url_code, vendor_name, dm_email, dm_name, 'admin', notes, selected_json))
             db.commit()
 
         db.close()
@@ -253,7 +430,7 @@ def admin_create_vendor():
         # Redirect to success page showing the link
         return redirect(url_for('admin_vendor_created', url_code=url_code))
 
-    return render_template('admin/create_vendor.html')
+    return render_template('admin/create_vendor.html', insurers=INSURERS, selected_insurers=[])
 
 
 @app.route('/admin/vendors/created/<url_code>')
@@ -407,11 +584,29 @@ def upload_page(url_code):
 
     db.close()
 
+    # Which insurers were pre-selected (by admin / DealTECH) for this vendor.
+    selected_insurers = []
+    if 'selected_insurers' in vendor.keys() and vendor['selected_insurers']:
+        try:
+            selected_insurers = clean_insurer_keys(json.loads(vendor['selected_insurers']))
+        except (ValueError, TypeError):
+            logger.warning("Vendor %s has unparseable selected_insurers", url_code)
+            selected_insurers = []
+
+    files_out = []
+    for f in files:
+        d = dict(f)
+        ins_key = d.get('insurer') if 'insurer' in d else None
+        d['insurer_name'] = INSURER_NAME_BY_KEY.get(ins_key) if ins_key else None
+        files_out.append(d)
+
     return render_template('upload.html',
         vendor=vendor,
         url_code=url_code,
-        files=[dict(f) for f in files],
-        latest_submission=dict(latest_submission) if latest_submission else None
+        files=files_out,
+        latest_submission=dict(latest_submission) if latest_submission else None,
+        insurers=INSURERS,
+        selected_insurers=selected_insurers
     )
 
 
@@ -430,7 +625,7 @@ def list_files(url_code):
 
     files = db.execute('''
         SELECT id, filename, original_filename, file_size, uploaded_at,
-               status, validation_warnings, pii_report, policy_count, processing_summary
+               status, validation_warnings, pii_report, policy_count, processing_summary, insurer
         FROM vendor_files
         WHERE vendor_id = ?
         ORDER BY uploaded_at DESC
@@ -438,9 +633,15 @@ def list_files(url_code):
 
     db.close()
 
+    out = []
+    for f in files:
+        d = dict(f)
+        d['insurer_name'] = INSURER_NAME_BY_KEY.get(d.get('insurer')) if d.get('insurer') else None
+        out.append(d)
+
     return jsonify({
-        'files': [dict(f) for f in files],
-        'count': len(files)
+        'files': out,
+        'count': len(out)
     })
 
 
@@ -491,6 +692,12 @@ def handle_upload(url_code):
     # Check if user specified replacement action
     replace_file_id = request.form.get('replace_file_id')
     action = request.form.get('action', 'auto')  # auto, replace, add_new
+
+    # Optional insurer tag (which insurer this file belongs to). Validated against
+    # the catalogue; anything unknown/blank falls back to None (plain upload), so
+    # the legacy single-file / no-insurer path keeps working unchanged.
+    _clean = clean_insurer_keys([request.form.get('insurer', '')])
+    insurer_key = _clean[0] if _clean else None
 
     if match and score > 0.6 and action == 'auto' and not replace_file_id:
         # Found potential match - ask user what to do
@@ -556,8 +763,8 @@ def handle_upload(url_code):
     db.execute('''
         INSERT INTO vendor_files
         (vendor_id, filename, original_filename, file_path, file_size,
-         status, validation_warnings, pii_report, policy_count, processing_summary)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         status, validation_warnings, pii_report, policy_count, processing_summary, insurer)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         vendor['id'],
         cleaned_filename,
@@ -568,7 +775,8 @@ def handle_upload(url_code):
         json.dumps(validation.get('warnings', [])),
         json.dumps(pii_report),
         validation.get('row_count', 0),
-        json.dumps(processing_summary)
+        json.dumps(processing_summary),
+        insurer_key
     ))
     db.commit()
 
@@ -588,6 +796,8 @@ def handle_upload(url_code):
         'success': True,
         'file_id': file_id,
         'filename': file.filename,
+        'insurer': insurer_key,
+        'insurer_name': INSURER_NAME_BY_KEY.get(insurer_key) if insurer_key else None,
         'valid': validation['valid'],
         'positives': validation.get('positives', []),
         'warnings': validation.get('warnings', []),
@@ -883,6 +1093,10 @@ def api_create_vendor():
     dm_name = (data.get('dm_name') or '').strip()
     deal_id = data.get('deal_id')
     hubspot_deal_id = data.get('hubspot_deal_id')
+    # Optional pre-selection of insurers from DealTECH. Absent -> no pre-selection
+    # (behaves exactly as before). Unknown keys are dropped.
+    selected_insurers = clean_insurer_keys(data.get('insurers'))
+    selected_json = json.dumps(selected_insurers)
 
     if not vendor_name:
         return jsonify({'error': 'vendor_name is required'}), 400
@@ -910,9 +1124,9 @@ def api_create_vendor():
             try:
                 db.execute('''
                     INSERT INTO vendors
-                    (url_code, vendor_name, dm_email, dm_name, created_by, deal_id, hubspot_deal_id)
-                    VALUES (?, ?, ?, ?, 'dealtech', ?, ?)
-                ''', (candidate, vendor_name, dm_email, dm_name, deal_id, hubspot_deal_id))
+                    (url_code, vendor_name, dm_email, dm_name, created_by, deal_id, hubspot_deal_id, selected_insurers)
+                    VALUES (?, ?, ?, ?, 'dealtech', ?, ?, ?)
+                ''', (candidate, vendor_name, dm_email, dm_name, deal_id, hubspot_deal_id, selected_json))
                 db.commit()
                 url_code = candidate
                 break
