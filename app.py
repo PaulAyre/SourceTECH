@@ -1272,7 +1272,7 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
-        'version': '2.3.0',  # 2.3.0: auto one-off valuation fallback when no matching HubSpot P1 deal (no more hard-fail on the gate)
+        'version': '2.3.1',  # 2.3.1: reverted the one-off fallback — SourceTECH vendors are ALWAYS a HubSpot deal, so the P1 gate stays enforced
         'pavtech_available': pavtech_ok,
         'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()

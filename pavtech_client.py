@@ -57,16 +57,6 @@ class PavTechClient:
         try:
             # Step 1: Upload all files to PavTECH
             upload_result = self._upload_batch(file_paths, vendor_name)
-            if not upload_result.get('success') and upload_result.get('gate_blocked'):
-                # No matching HubSpot Deal at Valuation (P1). Rather than hard-fail
-                # the vendor, re-run as a PavTECH one-off valuation (skip_deal=1).
-                # Deal-linked vendors still take the gated path above; only ungated
-                # ones fall through here.
-                logger.info(
-                    "PavTECH HubSpot-deal gate blocked vendor '%s'; retrying as a one-off valuation.",
-                    vendor_name,
-                )
-                upload_result = self._upload_batch(file_paths, vendor_name, one_off=True)
             if not upload_result.get('success'):
                 return False, {'error': upload_result.get('error', 'Upload failed')}
 
@@ -130,23 +120,14 @@ class PavTechClient:
             logger.error(f"PavTECH batch processing error: {e}")
             return False, {'error': str(e)}
 
-    def _upload_batch(self, file_paths: List[Path], vendor_name: str,
-                      one_off: bool = False) -> Dict:
-        """Upload multiple files to PavTECH /api/batch/upload endpoint.
-
-        When one_off=True, sends skip_deal=1 so PavTECH bypasses its HubSpot-deal
-        gate (used when the vendor has no matching P1 Deal). PavTECH then routes
-        the output to its "OneTime Vals" area instead of a deal folder.
-        """
+    def _upload_batch(self, file_paths: List[Path], vendor_name: str) -> Dict:
+        """Upload multiple files to PavTECH /api/batch/upload endpoint."""
         try:
             files = []
             for path in file_paths:
                 files.append(('files', (path.name, open(path, 'rb'))))
 
             data = {'vendor_name': vendor_name}
-            if one_off:
-                data['skip_deal'] = '1'
-                data['generator_name'] = 'SourceTECH'
 
             response = requests.post(
                 f"{self.base_url}/api/batch/upload",
@@ -177,24 +158,13 @@ class PavTechClient:
             # notification surfaces this, and "Upload failed: 422" tells nobody
             # anything. Fall back to the code only if the body isn't JSON.
             detail = f'Upload failed: {response.status_code}'
-            gate_blocked = False
             try:
                 body = response.json()
-                if isinstance(body, dict):
-                    if body.get('error'):
-                        detail = str(body['error'])
-                    # PavTECH's HubSpot-deal gate returns 422 with a `gate` object
-                    # (or a "HubSpot Deal"/"Valuation stage" message). Flag it so
-                    # the caller can retry as a one-off valuation.
-                    if response.status_code == 422 and (
-                        body.get('gate') is not None
-                        or 'hubspot deal' in detail.lower()
-                        or 'valuation stage' in detail.lower()
-                    ):
-                        gate_blocked = True
+                if isinstance(body, dict) and body.get('error'):
+                    detail = str(body['error'])
             except Exception:
                 pass
-            return {'success': False, 'error': detail, 'gate_blocked': gate_blocked}
+            return {'success': False, 'error': detail}
 
         except requests.RequestException as e:
             logger.error(f"Upload request error: {e}")
