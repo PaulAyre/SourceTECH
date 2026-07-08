@@ -6,12 +6,12 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 2
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: SECRET_KEY
         generateValue: true
-      - key: SENDGRID_API_KEY
-        sync: false
       - key: PAVTECH_API_URL
-        value: https://pavtech.onrender.com
+        value: https://portfolioapp-d6aq.onrender.com
       - key: DATABASE
         value: /data/sourcetech.db
       - key: TEMP_DIR
@@ -29,7 +29,7 @@ services:
         sync: false
       # DealTECH bridge
       - key: DEALTECH_API_URL
-        value: https://dealtech.onrender.com
+        value: https://dealtech-m1js.onrender.com
       - key: WEBHOOK_SECRET
         sync: false   # must match DealTECH's WEBHOOK_SECRET exactly
       - key: PUBLIC_BASE_URL

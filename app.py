@@ -4,6 +4,7 @@ Main Flask application
 """
 from flask import Flask, request, render_template, redirect, url_for, jsonify, session
 from functools import wraps
+from werkzeug.utils import secure_filename
 from validator import validate_portfolio_file
 from pii_stripper import strip_pii
 from pavtech_client import PavTechClient
@@ -745,7 +746,12 @@ def handle_upload(url_code):
     # Save file to vendor's upload directory
     vendor_dir = get_vendor_upload_dir(url_code)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    safe_filename = f"{timestamp}_{file.filename}"
+    # Sanitise the client-supplied filename before it touches the filesystem —
+    # secure_filename strips path separators and traversal (`../`) so a hostile
+    # name can't escape the vendor's upload dir. Keep a fallback in case the name
+    # sanitises down to empty (e.g. all-unicode), preserving the checked extension.
+    clean_name = secure_filename(file.filename) or f"upload{file_ext}"
+    safe_filename = f"{timestamp}_{clean_name}"
     file_path = vendor_dir / safe_filename
     file.save(file_path)
 
@@ -1121,8 +1127,10 @@ def _api_secret_ok() -> bool:
     """If WEBHOOK_SECRET is configured, require a matching X-Webhook-Secret
     header on the server-to-server API. If unset (dev), allow + warn."""
     if not WEBHOOK_SECRET:
-        logger.warning("WEBHOOK_SECRET not set — /api/vendors is unauthenticated")
-        return True
+        # Fail loud + closed: an unauthenticated server-to-server API is a hole,
+        # not a convenience. Prod always sets this; deny rather than run open.
+        logger.error("WEBHOOK_SECRET not set — refusing /api/vendors request (fail-closed)")
+        return False
     return request.headers.get("X-Webhook-Secret") == WEBHOOK_SECRET
 
 
@@ -1264,7 +1272,7 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
-        'version': '2.1.0',  # 2.1.0 adds the DealTECH bridge (Ver3 launch)
+        'version': '2.2.0',  # 2.2.0: vendor tile UI + Submit + Resend DM, secure_filename, fail-closed API, render.yaml parity
         'pavtech_available': pavtech_ok,
         'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()
