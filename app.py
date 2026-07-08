@@ -1272,7 +1272,7 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
-        'version': '2.2.0',  # 2.2.0: vendor tile UI + Submit + Resend DM, secure_filename, fail-closed API, render.yaml parity
+        'version': '2.2.1',  # 2.2.1: DM emails carry PavTECH's real error (no raw HTTP codes), humanized failure copy
         'pavtech_available': pavtech_ok,
         'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()

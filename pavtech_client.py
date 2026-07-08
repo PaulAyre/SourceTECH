@@ -153,7 +153,18 @@ class PavTechClient:
                     return {'success': False, 'error': 'No batch_id in response'}
 
             logger.error(f"Upload failed: {response.status_code} - {response.text[:500]}")
-            return {'success': False, 'error': f'Upload failed: {response.status_code}'}
+            # Preserve PavTECH's human-readable error (e.g. the HubSpot-deal gate
+            # message) instead of collapsing it to a bare status code — the DM
+            # notification surfaces this, and "Upload failed: 422" tells nobody
+            # anything. Fall back to the code only if the body isn't JSON.
+            detail = f'Upload failed: {response.status_code}'
+            try:
+                body = response.json()
+                if isinstance(body, dict) and body.get('error'):
+                    detail = str(body['error'])
+            except Exception:
+                pass
+            return {'success': False, 'error': detail}
 
         except requests.RequestException as e:
             logger.error(f"Upload request error: {e}")

@@ -7,6 +7,7 @@ than async httpx. Fails LOUDLY: any missing key or non-2xx from Resend is logged
 at ERROR and returned as a failure, never a silent no-op.
 """
 import os
+import re
 import base64
 import logging
 from pathlib import Path
@@ -96,6 +97,30 @@ def send_email(to_email: str, subject: str, html_body: str,
     return True, {'id': message_id, 'status': resp.status_code}
 
 
+def _humanize_error(error: Optional[str]) -> str:
+    """Turn an internal error string into DM-appropriate copy.
+
+    A deal manager should never see a raw HTTP code or traceback. PavTECH's own
+    gate messages are already human-readable and useful, so pass those through;
+    but scrub bare "Upload failed: 500" / exception-looking strings down to a
+    clean, generic line. The raw error still lives in the logs + submission record.
+    """
+    detail = (error or '').strip()
+    if not detail:
+        return 'Automated valuation did not complete.'
+    low = detail.lower()
+    looks_technical = (
+        re.match(r'^upload failed:\s*\d+\s*$', low) is not None
+        or 'traceback' in low
+        or 'exception' in low
+        or low.startswith('httperror')
+        or low.startswith('connectionerror')
+    )
+    if looks_technical:
+        return 'The automated valuation could not be completed. The files have been saved and queued for manual processing in PavTECH.'
+    return detail
+
+
 def _valuation_rows_html(valuation: Dict) -> str:
     rows = [
         ('Total policies', f"{valuation.get('total_policies', 0):,}"),
@@ -154,7 +179,7 @@ def send_dm_notification(
         )
     else:
         subject = f"Portfolio received (valuation issue) - {vendor_name}"
-        detail = error or 'Automated valuation did not complete.'
+        detail = _humanize_error(error)
         html_body = f"""\
 <div style="font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1a202c;">
   <p>Hi {greeting},</p>
