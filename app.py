@@ -1272,7 +1272,7 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
-        'version': '2.2.1',  # 2.2.1: DM emails carry PavTECH's real error (no raw HTTP codes), humanized failure copy
+        'version': '2.3.0',  # 2.3.0: auto one-off valuation fallback when no matching HubSpot P1 deal (no more hard-fail on the gate)
         'pavtech_available': pavtech_ok,
         'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()
