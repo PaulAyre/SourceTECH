@@ -626,12 +626,26 @@ def upload_page(url_code):
             key = OTHER_KEY
         files_by_insurer.setdefault(key, []).append(d)
 
+    # Parse the stored valuation JSON here (it's a TEXT column holding a JSON
+    # string) so the template can read it as a plain dict. Doing this in Python
+    # avoids a fragile Jinja filter chain — an earlier template used an
+    # unregistered `fromjson` filter, which 500'd the page for any vendor that
+    # already had a completed valuation.
+    latest_submission_d = dict(latest_submission) if latest_submission else None
+    latest_valuation = None
+    if latest_submission_d and latest_submission_d.get('valuation_summary'):
+        try:
+            latest_valuation = json.loads(latest_submission_d['valuation_summary'])
+        except (ValueError, TypeError):
+            latest_valuation = None
+
     return render_template('upload.html',
         vendor=vendor,
         url_code=url_code,
         files=files_out,
         files_by_insurer=files_by_insurer,
-        latest_submission=dict(latest_submission) if latest_submission else None,
+        latest_submission=latest_submission_d,
+        latest_valuation=latest_valuation,
         insurers=INSURERS,
         selected_insurers=selected_insurers
     )
@@ -1272,7 +1286,7 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
-        'version': '2.3.1',  # 2.3.1: reverted the one-off fallback — SourceTECH vendors are ALWAYS a HubSpot deal, so the P1 gate stays enforced
+        'version': '2.3.2',  # 2.3.2: fix 500 on upload page for vendors with a completed valuation (unregistered 'fromjson' Jinja filter)
         'pavtech_available': pavtech_ok,
         'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()

@@ -190,7 +190,7 @@
                 <div class="st-valuation">
                     <div class="st-valuation-label">Estimated Portfolio Value</div>
                     <div class="st-valuation-amount" id="valuation-amount">
-                        ${{ '{:,.0f}'.format((latest_submission.valuation_summary|tojson|fromjson).get('estimated_value', 0) if latest_submission.valuation_summary else 0) }}
+                        ${{ '{:,.0f}'.format(latest_valuation.get('estimated_value', 0) if latest_valuation else 0) }}
                     </div>
                     <div class="st-valuation-note">
                         Updated {{ latest_submission.submitted_at[:10] if latest_submission.submitted_at else 'Recently' }}
