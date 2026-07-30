@@ -39,6 +39,12 @@
 - Missing fields result in assumptions (e.g., Age 63, Income Protection product)
 - Required fields: Premium, Benefit Type, Status, DOB/Age
 
-### 9. URL Codes
+### 9. Local venv is a dead relic
+- `venv/` in the repo points at `/mnt/c/Programming/...` (WSL, from the old Windows laptop) - its binaries do not run on the Mac. Create a fresh venv from `requirements.txt` for local testing.
+
+### 10. PavTECH health probe
+- PavTECH prod has NO `/api/health`; its sanctioned check is `/api/version`. Do not probe `GET /` - it serves the GUI behind a flask-limiter default bucket (50/hour, proxy-shared keys) and 429s under repeated probing, which made SourceTECH's `/health` falsely report `pavtech_available: false`.
+
+### 11. URL Codes
 - Generated via `secrets.token_urlsafe(6)[:8].upper()` - 8 uppercase chars
 - If collision occurs on insert, one retry is attempted (then would fail)

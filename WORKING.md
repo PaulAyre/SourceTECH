@@ -31,6 +31,9 @@ Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> 
 - Git initialized, v2.0 committed on master
 
 ## Version History
+- **v2.4.0** - Best-of-both-worlds UX merge from Thomas Hawke's valu-guide-sync prototype (team feedback 2026-07-29): per-tile download guides collapsed behind a "How to download your file" dropdown; step indicator (Select / Upload / Review / Done); Review & Submit modal backed by new GET /<code>/review (same dedup as submit); submission receipt with quotable reference (ST-YYYYMMDD-XXXX, new submissions.reference column); APP_VERSION single source of truth; PavTECH health check moved to /api/version (GET / sits behind PavTECH's rate limiter and 429s, falsely reporting degraded)
+- **v2.3.x** - Prod hardening: secure_filename, fail-closed API secret, render.yaml parity, DM email error scrubbing, fromjson 500 fix; HubSpot P1 gate kept enforced
+- **v2.2.0** - Submit action, filename-dedup working set, per-tile files, Resend DM email, vendor tiles UI
 - **v2.0** - Full UI redesign with PavTECH styling, insurer sidebar, smart drag-and-drop
 - **v1.0** - Initial codebase (commit 3c6768a)
 

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v2.1</title>
-    <link href="{{ url_for('static', filename='css/style.css') }}?v=2.1.10" rel="stylesheet">
+    <title>Portfolio Upload - {{ vendor.vendor_name }} | SourceTECH v{{ app_version }}</title>
+    <link href="{{ url_for('static', filename='css/style.css') }}?v={{ app_version }}" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='images/iPlus_white.png') }}" type="image/png">
 </head>
 <body>
@@ -18,9 +18,9 @@
             </div>
         </a>
         <div class="st-header-right">
-            <button type="button" class="st-btn st-btn-primary st-submit-btn" id="submit-btn" onclick="triggerSubmit()">
+            <button type="button" class="st-btn st-btn-primary st-submit-btn" id="submit-btn" onclick="openReview()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                Submit to InsurancePLUS
+                Review &amp; Submit
             </button>
         </div>
     </header>
@@ -29,19 +29,40 @@
     <div class="st-app-layout">
         <main class="st-main st-main-wide">
 
-            <!-- Submitted confirmation (revealed after Submit) -->
+            <!-- Submission receipt (revealed after Submit) -->
             <div class="st-card st-submitted-card" id="submitted-card" style="display: none;">
                 <div class="st-submitted">
                     <div class="st-submitted-icon">&#10003;</div>
-                    <h3>Submitted</h3>
-                    <p id="submitted-msg">InsurancePLUS will process your portfolio. You can close this page; we will email your Deal Manager when the valuation is ready.</p>
+                    <h3>Submitted for valuation</h3>
+                    <p id="submitted-msg">InsurancePLUS is processing your portfolio. You can close this page; we will email your Deal Manager when the valuation is ready.</p>
+                </div>
+                <div class="st-receipt" id="receipt" style="display: none;">
+                    <div class="st-receipt-grid">
+                        <div class="st-receipt-row"><span>Reference</span><strong id="receipt-ref">&mdash;</strong></div>
+                        <div class="st-receipt-row"><span>Submitted</span><strong id="receipt-time">&mdash;</strong></div>
+                        <div class="st-receipt-row"><span>Files</span><strong id="receipt-files">&mdash;</strong></div>
+                        <div class="st-receipt-row"><span>Data rows</span><strong id="receipt-rows">&mdash;</strong></div>
+                    </div>
+                    <div id="receipt-insurers"></div>
+                    <p class="st-receipt-next">Keep the reference above if you need to ask about this submission.</p>
                 </div>
             </div>
 
             <!-- Welcome Card -->
             <div class="st-card st-welcome">
                 <h1>Portfolio upload for {{ vendor.vendor_name }}</h1>
-                <p>Tick the insurers you hold. Each tile is a self-contained step: read the guide, open that insurer's portal beside this page, then drag the downloaded file straight onto the tile. When you are done, click Submit to InsurancePLUS (top right).</p>
+                <p>Tick the insurers you hold. Each tile is a self-contained step: open that insurer's portal beside this page, then drag the downloaded file straight onto the tile. When you are done, click Review &amp; Submit (top right).</p>
+            </div>
+
+            <!-- Step indicator -->
+            <div class="st-steps" id="step-indicator">
+                <div class="st-step" data-step="1"><span class="st-step-num">1</span><span class="st-step-label">Select insurers</span></div>
+                <div class="st-step-line"></div>
+                <div class="st-step" data-step="2"><span class="st-step-num">2</span><span class="st-step-label">Upload files</span></div>
+                <div class="st-step-line"></div>
+                <div class="st-step" data-step="3"><span class="st-step-num">3</span><span class="st-step-label">Review &amp; submit</span></div>
+                <div class="st-step-line"></div>
+                <div class="st-step" data-step="4"><span class="st-step-num">4</span><span class="st-step-label">Done</span></div>
             </div>
 
             <!-- Chrome drag tip -->
@@ -120,18 +141,25 @@
                             {% endif %}
                         </div>
 
-                        <ol class="st-insurer-steps">
-                            {% for step in ins.steps %}
-                            <li>{{ step|safe }}</li>
-                            {% endfor %}
-                        </ol>
+                        <details class="st-tile-guide">
+                            <summary>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                How to download your file
+                                <svg class="st-tile-guide-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                            </summary>
+                            <ol class="st-insurer-steps">
+                                {% for step in ins.steps %}
+                                <li>{{ step|safe }}</li>
+                                {% endfor %}
+                            </ol>
 
-                        {% if ins.hint %}
-                        <div class="st-insurer-hint">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                            {{ ins.hint }}
-                        </div>
-                        {% endif %}
+                            {% if ins.hint %}
+                            <div class="st-insurer-hint">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                {{ ins.hint }}
+                            </div>
+                            {% endif %}
+                        </details>
 
                         <div class="st-tile-files" data-key="{{ ins.key }}">
                             {% for f in files_by_insurer.get(ins.key, []) %}
@@ -223,6 +251,22 @@
         </div>
     </div>
 
+    <!-- Review & Submit Modal -->
+    <div class="st-modal-overlay" id="review-modal">
+        <div class="st-modal st-modal-wide">
+            <h3>Review &amp; submit</h3>
+            <p>This is exactly what will be sent to InsurancePLUS. Personal information has already been removed.</p>
+            <div id="review-content"></div>
+            <div class="st-modal-actions">
+                <button class="st-btn st-btn-primary" id="btn-confirm-submit">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Confirm &amp; Submit
+                </button>
+                <button class="st-btn st-btn-outline" id="btn-review-back">Back</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div class="st-toast" id="toast"></div>
 
@@ -238,8 +282,32 @@
             cb.addEventListener('change', () => {
                 const tile = cb.closest('.st-tile');
                 if (tile) tile.dataset.selected = cb.checked ? 'true' : 'false';
+                updateStepIndicator();
             });
         });
+
+        // ── Step indicator (Select → Upload → Review → Done) ───
+        // Reflects page state; it never gates anything. Done is only reached
+        // via an actual submit (or arriving while a submission is processing).
+        let submittedThisSession = false;
+
+        function currentStep() {
+            if (submittedThisSession) return 4;
+            if (document.querySelector('.st-tile-file[data-file-id]')) return 3;
+            if (document.querySelector('.st-tile[data-selected="true"]')) return 2;
+            return 1;
+        }
+
+        function updateStepIndicator() {
+            const step = currentStep();
+            document.querySelectorAll('#step-indicator .st-step').forEach(el => {
+                const n = parseInt(el.dataset.step, 10);
+                el.classList.toggle('active', n === step);
+                el.classList.toggle('done', n < step);
+                const num = el.querySelector('.st-step-num');
+                if (num) num.innerHTML = n < step ? '&#10003;' : String(n);
+            });
+        }
 
         function tileSelected(tile) {
             return tile && tile.dataset.selected === 'true';
@@ -451,6 +519,7 @@
                     const container = document.querySelector(`.st-tile-files[data-key="${tileKeyFor(f.insurer)}"]`);
                     if (container) container.appendChild(makeFileRow(f.id, f.original_filename));
                 }
+                updateStepIndicator();
             } catch (err) {
                 console.error('Failed to refresh tile files:', err);
             }
@@ -472,42 +541,137 @@
             }
         }
 
-        // ── Submit to InsurancePLUS ────────────────────────────
-        async function triggerSubmit() {
+        // ── Review & Submit ────────────────────────────────────
+        // Review first (what exactly will be sent), then confirm to submit.
+        let lastReview = null;
+
+        function esc(s) {
+            const div = document.createElement('div');
+            div.textContent = s == null ? '' : String(s);
+            return div.innerHTML;
+        }
+
+        function fmtNum(n) {
+            return (n || 0).toLocaleString('en-AU');
+        }
+
+        async function openReview() {
             const btn = document.getElementById('submit-btn');
-            const original = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = 'Submitting...';
+            try {
+                const response = await fetch(`/${urlCode}/review`);
+                const review = await response.json();
+                if (review.error) {
+                    showToast(review.error, 'error');
+                    return;
+                }
+                if (!review.totals || review.totals.files === 0) {
+                    showToast('Nothing to submit yet. Upload at least one file first.', 'error');
+                    return;
+                }
+                lastReview = review;
+                renderReview(review);
+                document.getElementById('review-modal').classList.add('active');
+            } catch (err) {
+                showToast('Could not load the review. Please try again.', 'error');
+            } finally {
+                if (!submittedThisSession) btn.disabled = false;
+            }
+        }
+
+        function renderReview(review) {
+            const t = review.totals;
+            const piiProtected = (t.pii_columns_removed || 0) + (t.pii_columns_anonymized || 0);
+            let html = `
+                <div class="st-review-stats">
+                    <div class="st-review-stat"><div class="st-review-stat-value">${fmtNum(t.files)}</div><div class="st-review-stat-label">File${t.files === 1 ? '' : 's'}</div></div>
+                    <div class="st-review-stat"><div class="st-review-stat-value">${fmtNum(t.policies)}</div><div class="st-review-stat-label">Data rows</div></div>
+                    <div class="st-review-stat"><div class="st-review-stat-value">${fmtNum(piiProtected)}</div><div class="st-review-stat-label">Personal-info columns protected</div></div>
+                </div>
+                <table class="st-review-table">
+                    <thead><tr><th>Insurer</th><th>File</th><th class="num">Rows</th></tr></thead>
+                    <tbody>`;
+            for (const f of review.files) {
+                html += `<tr><td>${esc(f.insurer_name || '')}</td><td class="filename">${esc(f.original_filename)}</td><td class="num">${fmtNum(f.policy_count)}</td></tr>`;
+            }
+            html += `</tbody></table>`;
+            if (t.uploads_superseded > 0) {
+                html += `<p class="st-review-note">${fmtNum(t.uploads_superseded)} older upload${t.uploads_superseded === 1 ? ' was' : 's were'} replaced by a newer file with the same name and will not be sent.</p>`;
+            }
+            document.getElementById('review-content').innerHTML = html;
+        }
+
+        function hideReviewModal() {
+            document.getElementById('review-modal').classList.remove('active');
+        }
+
+        document.getElementById('btn-review-back').addEventListener('click', hideReviewModal);
+
+        document.getElementById('btn-confirm-submit').addEventListener('click', doSubmit);
+
+        async function doSubmit() {
+            const confirmBtn = document.getElementById('btn-confirm-submit');
+            const btn = document.getElementById('submit-btn');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Submitting...';
             try {
                 const response = await fetch(`/${urlCode}/submit`, { method: 'POST' });
                 const result = await response.json();
                 if (result.success) {
-                    showSubmittedState(result.file_count);
+                    hideReviewModal();
+                    showSubmittedState(result);
                 } else {
                     showToast(result.error || 'Submit failed', 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = original;
                 }
             } catch (err) {
                 showToast('Submit failed. Please try again.', 'error');
-                btn.disabled = false;
-                btn.innerHTML = original;
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Confirm &amp; Submit';
+                if (!submittedThisSession) btn.disabled = false;
             }
         }
 
-        function showSubmittedState(fileCount) {
+        function showSubmittedState(result) {
+            submittedThisSession = true;
+            updateStepIndicator();
+
             const btn = document.getElementById('submit-btn');
             btn.disabled = true;
             btn.classList.add('submitted');
             btn.innerHTML = '&#10003; Submitted';
+
             const card = document.getElementById('submitted-card');
             const msg = document.getElementById('submitted-msg');
+            const fileCount = result.file_count;
             if (msg && fileCount) {
                 msg.textContent = `InsurancePLUS is now processing ${fileCount} file${fileCount > 1 ? 's' : ''}. You can close this page; we will email your Deal Manager when the valuation is ready.`;
             }
+
+            // Receipt: reference + timestamp from the server, composition from the review
+            const receipt = document.getElementById('receipt');
+            if (result.reference) {
+                document.getElementById('receipt-ref').textContent = result.reference;
+                const when = result.submitted_at ? new Date(result.submitted_at) : new Date();
+                document.getElementById('receipt-time').textContent = when.toLocaleString('en-AU');
+                document.getElementById('receipt-files').textContent = fmtNum(fileCount);
+                document.getElementById('receipt-rows').textContent = lastReview ? fmtNum(lastReview.totals.policies) : ', ';
+                const insEl = document.getElementById('receipt-insurers');
+                if (insEl && lastReview && lastReview.by_insurer.length) {
+                    let html = '<table class="st-review-table"><thead><tr><th>Insurer</th><th class="num">Files</th><th class="num">Rows</th></tr></thead><tbody>';
+                    for (const g of lastReview.by_insurer) {
+                        html += `<tr><td>${esc(g.name || '')}</td><td class="num">${fmtNum(g.files)}</td><td class="num">${fmtNum(g.policies)}</td></tr>`;
+                    }
+                    html += '</tbody></table>';
+                    insEl.innerHTML = html;
+                }
+                receipt.style.display = 'block';
+            }
+
             card.style.display = 'block';
             card.scrollIntoView({ behavior: 'smooth', block: 'start' });
             showToast('Submitted to InsurancePLUS', 'success');
+            pollStatus();
         }
 
         // ── Status polling ─────────────────────────────────────
@@ -602,10 +766,14 @@
             setTimeout(() => { toast.classList.remove('show'); }, 4000);
         }
 
-        // ── Auto-poll if processing ────────────────────────────
+        // ── Initial state ──────────────────────────────────────
+        // A vendor arriving while a submission is processing has already
+        // submitted: show Done and poll. Otherwise reflect selection/files.
         {% if vendor.status == 'processing' %}
+        submittedThisSession = true;
         pollStatus();
         {% endif %}
+        updateStepIndicator();
 
         const style = document.createElement('style');
         style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';

@@ -315,11 +315,17 @@ class PavTechClient:
             return None
 
     def health_check(self) -> bool:
-        """Check if PavTECH is available."""
+        """Check if PavTECH is available.
+
+        Probes /api/version, PavTECH's sanctioned health endpoint (its CLAUDE.md:
+        prod has no /api/health; use /api/version). GET / is NOT suitable: it
+        serves the GUI behind a flask-limiter default bucket, so repeated health
+        probes 429 and falsely report PavTECH as down.
+        """
         try:
-            response = requests.get(f"{self.base_url}/", timeout=5)
+            response = requests.get(f"{self.base_url}/api/version", timeout=5)
             return response.status_code == 200
-        except:
+        except requests.RequestException:
             return False
 
     # Legacy single-file method for backward compatibility

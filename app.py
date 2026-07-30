@@ -25,6 +25,15 @@ import shutil
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
+# Single source of truth for the app version: /health, page titles and the
+# static-asset cache-buster all read this.
+APP_VERSION = '2.4.0'
+
+
+@app.context_processor
+def inject_app_version():
+    return {'app_version': APP_VERSION}
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -310,6 +319,10 @@ def init_db():
     # insurer: which insurer catalogue key an uploaded file belongs to (or NULL
     # for a plain/untagged upload). Insurer-specific downstream PavTECH parsing.
     add_column_if_missing("vendor_files", "insurer", "insurer TEXT")
+    # reference: human-quotable submission reference (ST-YYYYMMDD-XXXX), generated
+    # at submit time and shown on the vendor's receipt so support conversations
+    # ("what's your reference?") can pin down the exact submission.
+    add_column_if_missing("submissions", "reference", "reference TEXT")
 
     db.commit()
     db.close()
@@ -540,6 +553,31 @@ def get_vendor_files(vendor_id: int) -> list:
     ''', (vendor_id,)).fetchall()
     db.close()
     return [dict(f) for f in files]
+
+
+def build_working_set(db, vendor_id: int) -> tuple:
+    """The deduped file set a Submit would send to PavTECH.
+
+    All uploads newest first, keeping only the latest upload of each ORIGINAL
+    filename (re-uploading an edited file with the same name replaces the older
+    one). Shared by the Review endpoint and the Submit action so the review
+    shows exactly what will be processed. Returns (working_rows, total_uploads).
+    """
+    all_files = db.execute('''
+        SELECT * FROM vendor_files
+        WHERE vendor_id = ?
+        ORDER BY uploaded_at DESC, id DESC
+    ''', (vendor_id,)).fetchall()
+
+    seen_names = set()
+    working = []
+    for f in all_files:
+        name = f['original_filename']
+        if name in seen_names:
+            continue  # older version of a same-named file; skip
+        seen_names.add(name)
+        working.append(f)
+    return working, len(all_files)
 
 
 def build_processing_summary(validation: dict, pii_report: dict) -> list:
@@ -897,6 +935,79 @@ def delete_file(url_code, file_id):
     return jsonify({'success': True, 'deleted': file_record['original_filename']})
 
 
+@app.route('/<url_code>/review')
+def review_submission(url_code):
+    """What a Submit would send, for the vendor's Review step.
+
+    Returns the deduped working set (same logic as /submit) grouped by insurer,
+    with per-file row counts and aggregate PII-stripping stats, so the vendor
+    confirms exactly what is about to be processed.
+    """
+    db = get_db()
+    vendor = db.execute(
+        "SELECT * FROM vendors WHERE url_code = ?",
+        (url_code,)
+    ).fetchone()
+
+    if not vendor:
+        db.close()
+        return jsonify({'error': 'Invalid link'}), 404
+
+    working, total_uploads = build_working_set(db, vendor['id'])
+    db.close()
+
+    files_out = []
+    by_insurer = {}
+    total_rows = 0
+    pii_columns_removed = 0
+    pii_columns_anonymized = 0
+
+    for f in working:
+        d = dict(f)
+        if not Path(d['file_path']).exists():
+            continue
+        key = d.get('insurer')
+        if key not in INSURER_KEYS:
+            key = OTHER_KEY
+        label = insurer_label(key)
+        try:
+            pii = json.loads(d.get('pii_report') or '{}')
+        except (ValueError, TypeError):
+            pii = {}
+        rows = d.get('policy_count') or 0
+        total_rows += rows
+        pii_columns_removed += len(pii.get('columns_removed', []))
+        pii_columns_anonymized += len(pii.get('columns_anonymized', []))
+
+        files_out.append({
+            'id': d['id'],
+            'insurer': key,
+            'insurer_name': label,
+            'original_filename': d['original_filename'],
+            'policy_count': rows,
+        })
+        grp = by_insurer.setdefault(key, {'key': key, 'name': label, 'files': 0, 'policies': 0})
+        grp['files'] += 1
+        grp['policies'] += rows
+
+    # Stable order: catalogue order, catch-all last
+    ordered_keys = [ins['key'] for ins in INSURERS if ins['key'] in by_insurer]
+    if OTHER_KEY in by_insurer:
+        ordered_keys.append(OTHER_KEY)
+
+    return jsonify({
+        'files': files_out,
+        'by_insurer': [by_insurer[k] for k in ordered_keys],
+        'totals': {
+            'files': len(files_out),
+            'policies': total_rows,
+            'uploads_superseded': total_uploads - len(working),
+            'pii_columns_removed': pii_columns_removed,
+            'pii_columns_anonymized': pii_columns_anonymized,
+        },
+    })
+
+
 @app.route('/<url_code>/revaluate', methods=['POST'])
 @app.route('/<url_code>/submit', methods=['POST'])
 def trigger_revaluation(url_code):
@@ -917,25 +1028,11 @@ def trigger_revaluation(url_code):
         db.close()
         return jsonify({'error': 'Invalid link'}), 404
 
-    # Get all files, newest first, then dedupe by original_filename (latest wins).
-    all_files = db.execute('''
-        SELECT * FROM vendor_files
-        WHERE vendor_id = ?
-        ORDER BY uploaded_at DESC, id DESC
-    ''', (vendor['id'],)).fetchall()
+    files, total_uploads = build_working_set(db, vendor['id'])
 
-    if not all_files:
+    if not files:
         db.close()
         return jsonify({'error': 'No files to process'}), 400
-
-    seen_names = set()
-    files = []
-    for f in all_files:
-        name = f['original_filename']
-        if name in seen_names:
-            continue  # older version of a same-named file; skip
-        seen_names.add(name)
-        files.append(f)
 
     # Collect file paths
     file_paths = [Path(f['file_path']) for f in files if Path(f['file_path']).exists()]
@@ -945,7 +1042,7 @@ def trigger_revaluation(url_code):
         return jsonify({'error': 'No valid files found'}), 400
 
     logger.info("Submit %s: %d uploads deduped to %d working files by filename",
-                url_code, len(all_files), len(file_paths))
+                url_code, total_uploads, len(file_paths))
 
     # Update vendor status
     db.execute('''
@@ -958,10 +1055,15 @@ def trigger_revaluation(url_code):
     files_list = [dict(f) for f in files]
     db.close()
 
+    # Human-quotable submission reference, shown on the vendor's receipt and
+    # stored on the submission row for support lookups.
+    submitted_at = datetime.now()
+    reference = f"ST-{submitted_at.strftime('%Y%m%d')}-{secrets.token_hex(2).upper()}"
+
     # Start background processing
     thread = threading.Thread(
         target=_process_batch_with_pavtech,
-        args=(vendor_dict, file_paths, files_list),
+        args=(vendor_dict, file_paths, files_list, reference),
         daemon=True
     )
     thread.start()
@@ -970,11 +1072,13 @@ def trigger_revaluation(url_code):
         'success': True,
         'processing': True,
         'file_count': len(file_paths),
+        'reference': reference,
+        'submitted_at': submitted_at.isoformat(),
         'message': f'Processing {len(file_paths)} files...'
     })
 
 
-def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list):
+def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list, reference: str = None):
     """Background batch processing with PavTECH."""
     db = get_db()
 
@@ -1007,15 +1111,16 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
             db.execute('''
                 INSERT INTO submissions
                 (vendor_id, pavtech_batch_id, file_count, policy_count,
-                 pavtech_status, master_document_path, valuation_summary)
-                VALUES (?, ?, ?, ?, 'complete', ?, ?)
+                 pavtech_status, master_document_path, valuation_summary, reference)
+                VALUES (?, ?, ?, ?, 'complete', ?, ?, ?)
             ''', (
                 vendor['id'],
                 result['batch_id'],
                 len(file_paths),
                 result.get('total_policies', 0),
                 str(master_path),
-                json.dumps(valuation)
+                json.dumps(valuation),
+                reference
             ))
 
             db.execute('''
@@ -1047,9 +1152,9 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
 
             db.execute('''
                 INSERT INTO submissions
-                (vendor_id, file_count, pavtech_status, validation_errors)
-                VALUES (?, ?, 'error', ?)
-            ''', (vendor['id'], len(file_paths), error_msg))
+                (vendor_id, file_count, pavtech_status, validation_errors, reference)
+                VALUES (?, ?, 'error', ?, ?)
+            ''', (vendor['id'], len(file_paths), error_msg, reference))
 
             db.execute('''
                 UPDATE vendors SET status = 'error' WHERE id = ?
@@ -1286,7 +1391,7 @@ def health():
     pavtech_ok = pavtech.health_check()
     return jsonify({
         'status': 'healthy' if pavtech_ok else 'degraded',
-        'version': '2.3.2',  # 2.3.2: fix 500 on upload page for vendors with a completed valuation (unregistered 'fromjson' Jinja filter)
+        'version': APP_VERSION,
         'pavtech_available': pavtech_ok,
         'dealtech_bridge': bool(os.environ.get('DEALTECH_API_URL')),
         'timestamp': datetime.now().isoformat()
