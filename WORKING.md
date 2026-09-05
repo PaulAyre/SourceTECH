@@ -23,7 +23,7 @@
 
 ## Architecture Flow
 ```
-Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> Email to DM
+Vendor Upload -> Validation -> PII Strip -> PavTECH Processing -> Master Doc -> Email to DM (List of DM's comes from Hubspot)
 ```
 
 ## Current Status
