@@ -633,6 +633,21 @@ def build_processing_summary(validation: dict, pii_report: dict) -> list:
     return summary
 
 
+def vendor_processing_state(raw_status) -> str:
+    """Map an internal vendor/submission status to a vendor-safe state string.
+
+    Vendor-reachable pages and JSON only ever see one of these four values.
+    Anything unrecognised falls back to 'pending' so a new internal status can
+    never leak through to the vendor by accident.
+    """
+    return {
+        'pending': 'pending',
+        'processing': 'processing',
+        'complete': 'processed',
+        'error': 'needs_attention',
+    }.get(raw_status or 'pending', 'pending')
+
+
 @app.route('/<url_code>')
 def upload_page(url_code):
     """Show portfolio manager page for vendor."""
@@ -653,14 +668,6 @@ def upload_page(url_code):
         WHERE vendor_id = ?
         ORDER BY uploaded_at DESC
     ''', (vendor['id'],)).fetchall()
-
-    # Get latest submission for valuation info
-    latest_submission = db.execute('''
-        SELECT * FROM submissions
-        WHERE vendor_id = ?
-        ORDER BY submitted_at DESC
-        LIMIT 1
-    ''', (vendor['id'],)).fetchone()
 
     db.close()
 
@@ -690,26 +697,15 @@ def upload_page(url_code):
             key = OTHER_KEY
         files_by_insurer.setdefault(key, []).append(d)
 
-    # Parse the stored valuation JSON here (it's a TEXT column holding a JSON
-    # string) so the template can read it as a plain dict. Doing this in Python
-    # avoids a fragile Jinja filter chain — an earlier template used an
-    # unregistered `fromjson` filter, which 500'd the page for any vendor that
-    # already had a completed valuation.
-    latest_submission_d = dict(latest_submission) if latest_submission else None
-    latest_valuation = None
-    if latest_submission_d and latest_submission_d.get('valuation_summary'):
-        try:
-            latest_valuation = json.loads(latest_submission_d['valuation_summary'])
-        except (ValueError, TypeError):
-            latest_valuation = None
-
+    # HARD RULE: this page is CUSTOMER FACING. The submission row (valuation
+    # summary, master document path) is deliberately NOT loaded or passed to the
+    # template. The vendor only ever sees a neutral processing state.
     return render_template('upload.html',
         vendor=vendor,
         url_code=url_code,
         files=files_out,
         files_by_insurer=files_by_insurer,
-        latest_submission=latest_submission_d,
-        latest_valuation=latest_valuation,
+        processing_state=vendor_processing_state(vendor['status']),
         insurers=INSURERS,
         selected_insurers=selected_insurers
     )
@@ -1163,6 +1159,7 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
                 url_code=vendor['url_code'],
                 valuation=valuation,
                 attachment_path=master_path,
+                pavtech_valuation=result.get('total_valuation'),
             )
             if ok:
                 logger.info("DM valuation-complete email sent to %s (resend id=%s)",
@@ -1212,7 +1209,12 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
 
 @app.route('/<url_code>/status')
 def get_status(url_code):
-    """Get current processing status for vendor."""
+    """Vendor-safe processing status, polled by the upload page every 3s.
+
+    HARD RULE: SourceTECH is CUSTOMER FACING. No valuation data (value, multiple,
+    commission total, master document path, PavTECH URL or error text) may appear
+    in this response. The DM gets the detail by email.
+    """
     db = get_db()
     vendor = db.execute(
         "SELECT * FROM vendors WHERE url_code = ?",
@@ -1223,9 +1225,11 @@ def get_status(url_code):
         db.close()
         return jsonify({'error': 'Invalid link'}), 404
 
-    # Get latest submission
+    # Latest submission: named safe columns only, never SELECT * (the row also
+    # holds valuation_summary and master_document_path).
     latest = db.execute('''
-        SELECT * FROM submissions
+        SELECT reference, submitted_at, file_count, pavtech_status
+        FROM submissions
         WHERE vendor_id = ?
         ORDER BY submitted_at DESC
         LIMIT 1
@@ -1239,11 +1243,21 @@ def get_status(url_code):
 
     db.close()
 
+    # WHITELIST: every key below is named explicitly. Never return dict(row)
+    # from a vendor-reachable route.
+    latest_out = None
+    if latest:
+        latest_out = {
+            'reference': latest['reference'],
+            'submitted_at': latest['submitted_at'],
+            'file_count': latest['file_count'],
+            'state': vendor_processing_state(latest['pavtech_status']),
+        }
+
     return jsonify({
-        'status': vendor['status'],
+        'state': vendor_processing_state(vendor['status']),
         'file_count': file_count,
-        'latest_submission': dict(latest) if latest else None,
-        'valuation': json.loads(latest['valuation_summary']) if latest and latest['valuation_summary'] else None
+        'latest_submission': latest_out,
     })
 
 

@@ -121,14 +121,29 @@ def _humanize_error(error: Optional[str]) -> str:
     return detail
 
 
-def _valuation_rows_html(valuation: Dict) -> str:
+def _pavtech_valuation_or_none(pavtech_valuation) -> Optional[float]:
+    """PavTECH's real batch valuation as a positive float, else None.
+
+    INTERNAL (DM email) only. Never a locally computed estimate: if PavTECH did
+    not report a positive figure the line is dropped rather than shown as $0.
+    """
+    try:
+        amount = float(pavtech_valuation)
+    except (TypeError, ValueError):
+        return None
+    return amount if amount > 0 else None
+
+
+def _valuation_rows_html(valuation: Dict, pavtech_valuation=None) -> str:
     rows = [
         ('Total policies', f"{valuation.get('total_policies', 0):,}"),
         ('In-force policies', f"{valuation.get('in_force_policies', 0):,}"),
         ('Annual premium', format_currency(valuation.get('total_annual_premium', 0))),
         ('Annual commission', format_currency(valuation.get('total_annual_commission', 0))),
-        ('Estimated value', format_currency(valuation.get('estimated_value', 0))),
     ]
+    amount = _pavtech_valuation_or_none(pavtech_valuation)
+    if amount is not None:
+        rows.append(('PavTECH valuation', format_currency(amount)))
     trs = "".join(
         f'<tr><td style="padding:4px 12px 4px 0;color:#495057;">{label}</td>'
         f'<td style="padding:4px 0;font-weight:600;color:#1a202c;">{value}</td></tr>'
@@ -146,14 +161,25 @@ def send_dm_notification(
     pii_report: Optional[Dict] = None,
     attachment_path: Optional[Path] = None,
     error: Optional[str] = None,
+    pavtech_valuation: Optional[float] = None,
 ) -> Tuple[bool, Dict]:
     """Notify the Deal Manager about a submitted portfolio.
 
     Success (valuation present, no error): "valuation complete for <vendor>",
     with the master output attached. Failure (error set): "received, valuation
     issue". Always sends to the passed to_email (the vendor's stored dm_email).
+
+    INTERNAL ONLY: this email goes to the Deal Manager, never the vendor, so it
+    may carry figures. pavtech_valuation is PavTECH's real batch total
+    (process_batch total_valuation); the line is omitted when it is not a
+    positive number.
     """
     greeting = dm_name or 'there'
+    pavtech_amount = _pavtech_valuation_or_none(pavtech_valuation)
+    pavtech_line = (
+        f"PavTECH valuation: {format_currency(pavtech_amount)}\n"
+        if pavtech_amount is not None else ""
+    )
 
     if valuation and not valuation.get('error'):
         subject = f"Portfolio valuation complete - {vendor_name}"
@@ -161,7 +187,7 @@ def send_dm_notification(
 <div style="font-family:Calibri,Segoe UI,Arial,sans-serif;color:#1a202c;">
   <p>Hi {greeting},</p>
   <p>The portfolio valuation is complete for <strong>{vendor_name}</strong>.</p>
-  {_valuation_rows_html(valuation)}
+  {_valuation_rows_html(valuation, pavtech_valuation)}
   <p>The full valuation master is attached to this email.</p>
   <p style="color:#6c757d;font-size:13px;">Reference: {url_code}</p>
   <p style="color:#1e5631;font-weight:600;">InsurancePLUS SourceTECH</p>
@@ -173,7 +199,7 @@ def send_dm_notification(
             f"In-force policies: {valuation.get('in_force_policies', 0):,}\n"
             f"Annual premium: {format_currency(valuation.get('total_annual_premium', 0))}\n"
             f"Annual commission: {format_currency(valuation.get('total_annual_commission', 0))}\n"
-            f"Estimated value: {format_currency(valuation.get('estimated_value', 0))}\n\n"
+            f"{pavtech_line}\n"
             f"The full valuation master is attached.\n\n"
             f"Reference: {url_code}\n\nInsurancePLUS SourceTECH\n"
         )

@@ -19,19 +19,19 @@ FIELD_PATTERNS = {
         'patterns': ['benefit', 'product', 'cover type', 'plan type', 'policy type', 'benefit type', 'cover'],
         'critical': False,
         'assumption': 'Income Protection',
-        'assumption_reason': "We'll treat unknown products as Income Protection (most conservative). Life/TPD/Trauma policies may be worth more!",
+        'assumption_reason': "We'll treat unknown products as Income Protection. Adding a product or benefit type column gives a more accurate result.",
     },
     'in_force': {
         'patterns': ['in force', 'in-force', 'status', 'policy status', 'active', 'inforce'],
         'critical': False,
         'assumption': 'All In Force',
-        'assumption_reason': "We'll assume all policies are currently active. If any have lapsed, the final settlement value will be adjusted.",
+        'assumption_reason': "We'll assume all policies are currently active. If any have lapsed, this will be corrected during review.",
     },
     'dob_or_age': {
         'patterns': ['dob', 'date of birth', 'birth date', 'birth', 'age', 'age next', 'age_next', 'client age'],
         'critical': False,
         'assumption': 'Age 63',
-        'assumption_reason': "We'll use age 63 (conservative estimate - lowest multiple). Adding client ages could significantly increase your valuation!",
+        'assumption_reason': "We'll use age 63 as a default. Adding client ages or dates of birth gives a more accurate result.",
     }
 }
 
