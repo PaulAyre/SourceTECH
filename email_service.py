@@ -7,6 +7,7 @@ than async httpx. Fails LOUDLY: any missing key or non-2xx from Resend is logged
 at ERROR and returned as a failure, never a silent no-op.
 """
 import os
+from html import escape as html_escape
 import re
 import base64
 import logging
@@ -162,6 +163,7 @@ def send_dm_notification(
     attachment_path: Optional[Path] = None,
     error: Optional[str] = None,
     pavtech_valuation: Optional[float] = None,
+    extra_notes: Optional[list] = None,
 ) -> Tuple[bool, Dict]:
     """Notify the Deal Manager about a submitted portfolio.
 
@@ -175,6 +177,12 @@ def send_dm_notification(
     positive number.
     """
     greeting = dm_name or 'there'
+    # Things the DM should know about this submission (files that never arrived,
+    # personal details the server had to remove, files that need a look). The
+    # vendor is never blocked by these; the DM is always told.
+    notes = [str(n) for n in (extra_notes or []) if n]
+    notes_html = ("<p><strong>Worth knowing:</strong></p><ul>" + "".join(f"<li>{html_escape(n)}</li>" for n in notes) + "</ul>") if notes else ""
+    notes_text = ("Worth knowing:\n" + "".join(f"  - {n}\n" for n in notes) + "\n") if notes else ""
     pavtech_amount = _pavtech_valuation_or_none(pavtech_valuation)
     pavtech_line = (
         f"PavTECH valuation: {format_currency(pavtech_amount)}\n"
@@ -189,6 +197,7 @@ def send_dm_notification(
   <p>The portfolio valuation is complete for <strong>{vendor_name}</strong>.</p>
   {_valuation_rows_html(valuation, pavtech_valuation)}
   <p>The full valuation master is attached to this email.</p>
+  {notes_html}
   <p style="color:#6c757d;font-size:13px;">Reference: {url_code}</p>
   <p style="color:#1e5631;font-weight:600;">InsurancePLUS SourceTECH</p>
 </div>"""
@@ -201,6 +210,7 @@ def send_dm_notification(
             f"Annual commission: {format_currency(valuation.get('total_annual_commission', 0))}\n"
             f"{pavtech_line}\n"
             f"The full valuation master is attached.\n\n"
+            f"{notes_text}"
             f"Reference: {url_code}\n\nInsurancePLUS SourceTECH\n"
         )
     else:
@@ -212,6 +222,7 @@ def send_dm_notification(
   <p><strong>{vendor_name}</strong> has submitted their portfolio and the files were received and saved.</p>
   <p>Automated valuation hit an issue: {detail}</p>
   <p>The files are available for manual processing in PavTECH.</p>
+  {notes_html}
   <p style="color:#6c757d;font-size:13px;">Reference: {url_code}</p>
   <p style="color:#1e5631;font-weight:600;">InsurancePLUS SourceTECH</p>
 </div>"""
@@ -220,6 +231,7 @@ def send_dm_notification(
             f"{vendor_name} has submitted their portfolio; files received and saved.\n\n"
             f"Automated valuation hit an issue: {detail}\n\n"
             f"The files are available for manual processing in PavTECH.\n\n"
+            f"{notes_text}"
             f"Reference: {url_code}\n\nInsurancePLUS SourceTECH\n"
         )
 

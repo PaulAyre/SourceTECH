@@ -31,7 +31,8 @@ class PavTechClient:
         self.poll_interval = 3  # seconds
         self.max_poll_time = 600  # 10 minutes max
 
-    def process_batch(self, file_paths: List[Path], vendor_name: str) -> Tuple[bool, Dict]:
+    def process_batch(self, file_paths: List[Path], vendor_name: str, deal_id: str = None,
+                      generator_name: str = None) -> Tuple[bool, Dict]:
         """
         Process multiple files through PavTECH as a batch.
 
@@ -56,7 +57,7 @@ class PavTechClient:
 
         try:
             # Step 1: Upload all files to PavTECH
-            upload_result = self._upload_batch(file_paths, vendor_name)
+            upload_result = self._upload_batch(file_paths, vendor_name, deal_id=deal_id, generator_name=generator_name)
             if not upload_result.get('success'):
                 return False, {'error': upload_result.get('error', 'Upload failed')}
 
@@ -88,7 +89,7 @@ class PavTechClient:
             logger.info(f"PavTECH batch processing complete: {batch_id}")
 
             # Step 4: Generate master document
-            generate_result = self._generate_master(vendor_name, batch_id)
+            generate_result = self._generate_master(vendor_name, batch_id, deal_id=deal_id, generator_name=generator_name)
             if not generate_result.get('success'):
                 logger.warning(f"Master generation returned: {generate_result}")
                 # Continue anyway - might already exist
@@ -120,7 +121,8 @@ class PavTechClient:
             logger.error(f"PavTECH batch processing error: {e}")
             return False, {'error': str(e)}
 
-    def _upload_batch(self, file_paths: List[Path], vendor_name: str) -> Dict:
+    def _upload_batch(self, file_paths: List[Path], vendor_name: str, deal_id: str = None,
+                      generator_name: str = None) -> Dict:
         """Upload multiple files to PavTECH /api/batch/upload endpoint."""
         try:
             files = []
@@ -128,6 +130,10 @@ class PavTechClient:
                 files.append(('files', (path.name, open(path, 'rb'))))
 
             data = {'vendor_name': vendor_name}
+            if deal_id:
+                data['deal_id'] = str(deal_id)          # HubSpot deal id: PavTECH ties the run to this exact deal
+            if generator_name:
+                data['generator_name'] = generator_name
 
             response = requests.post(
                 f"{self.base_url}/api/batch/upload",
@@ -250,14 +256,17 @@ class PavTechClient:
 
         return {'error': 'Processing timeout', 'all_complete': False}
 
-    def _generate_master(self, vendor_name: str, batch_id: str) -> Dict:
+    def _generate_master(self, vendor_name: str, batch_id: str, deal_id: str = None,
+                         generator_name: str = None) -> Dict:
         """Request PavTECH to generate the master document via /api/batch/generate_master."""
         try:
             response = requests.post(
                 f"{self.base_url}/api/batch/generate_master",
                 json={
                     'vendor_name': vendor_name,
-                    'batch_id': batch_id
+                    'batch_id': batch_id,
+                    **({'deal_id': str(deal_id)} if deal_id else {}),
+                    **({'generator_name': generator_name} if generator_name else {}),
                 },
                 timeout=120  # Master generation can take a while
             )

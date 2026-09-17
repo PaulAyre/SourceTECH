@@ -1,0 +1,133 @@
+{
+ "_about": "Expected export headers per insurer tile (prong A of the PII stripper, and the 'this does not look like an X file' note). Seeded from Thomas Hawke's valu-guide-sync field mappings. Each tile lists one or more layouts; the closest is used. To be replaced by PavTECH's GET /api/expectations when that exists.",
+ "aia": [
+  {
+   "Adviser Name": "adviser_name",
+   "Adviser Code": "adviser_code",
+   "Policy Number": "policy_id",
+   "LifeInsured Date of Birth": "dob",
+   "Status": "status",
+   "Issue Date": "start_date",
+   "Product": "product",
+   "Benefit Description": "product_type",
+   "Premium Frequency": "premium_frequency",
+   "Gross Premium Payable": "annual_premium",
+   "Renewal Commission Rate (GST exclusive)": "renewal_comm"
+  },
+  {
+   "Adviser Name": "adviser_name",
+   "Adviser Code": "adviser_code",
+   "Policy Number": "policy_id",
+   "LifeInsured Date Of Birth": "dob",
+   "Status": "status",
+   "Issue Date": "start_date",
+   "Product": "product",
+   "Benefit Description": "product_type",
+   "Premium Frequency": "premium_frequency",
+   "Gross Premium Payable": "annual_premium",
+   "Renewal Comm Rate %": "renewal_comm"
+  }
+ ],
+ "tal": [
+  {
+   "Adviser Name": "adviser_name",
+   "Adviser Number": "adviser_code",
+   "Policy Number": "policy_id",
+   "Date of Birth": "dob",
+   "Status": "status",
+   "Commencement Date": "start_date",
+   "Product": "product",
+   "Benefit Type": "product_type",
+   "Pay Frequency": "premium_frequency",
+   "Annual Premium": "annual_premium",
+   "Renewal Commission Rate (incl. GST)": "renewal_comm"
+  }
+ ],
+ "zurich": [
+  {
+   "Adviser Number": "adviser_code",
+   "Policy Number": "policy_id",
+   "Date of Birth": "dob",
+   "Policy Risk Commencement Date": "start_date",
+   "Product Name": "product",
+   "Payment Frequency": "premium_frequency",
+   "Annual Premium": "annual_premium",
+   "Renewal Commission": "renewal_comm"
+  },
+  {
+   "Adviser number": "adviser_code",
+   "Policy Number": "policy_id",
+   "Date of Birth": "dob",
+   "Risk Commencmeent Date": "start_date",
+   "Policy Type": "product",
+   "Payment Frequency": "premium_frequency"
+  }
+ ],
+ "mlc": [
+  {
+   "Policy Number": "policy_id",
+   "Life Insured - Date of Birth": "dob",
+   "Policy Status": "status",
+   "Policy Date of Entry": "start_date",
+   "Policy -Product": "product",
+   "Types of Insurance (Benefit Name)": "product_type",
+   "Policy Payment Frequency": "premium_frequency",
+   "Policy Total Annualised Premium": "annual_premium"
+  }
+ ],
+ "metlife": [
+  {
+   "Agent_Name": "adviser_name",
+   "Agent_Id": "adviser_code",
+   "Policy_No": "policy_id",
+   "Insured_Date_Of_Birth": "dob",
+   "Policy_Status": "status",
+   "Policy_Commencement_Date": "start_date",
+   "Product_Name": "product",
+   "Payment_Frequency": "premium_frequency",
+   "Annual_Premium": "annual_premium",
+   "Commission_Style_Renewal": "renewal_comm"
+  }
+ ],
+ "clearview": [
+  {
+   "Adviser Name": "adviser_name",
+   "Adviser Sales Code": "adviser_code",
+   "Policy No": "policy_id",
+   "Date Of Birth": "dob",
+   "Policy Status": "status",
+   "Policy Start Date": "start_date",
+   "Benefit": "product",
+   "Benefit Type": "product_type",
+   "Payment Freq": "premium_frequency",
+   "Annual Gross Prem": "annual_premium",
+   "Comm Perc Renewal": "renewal_comm"
+  }
+ ],
+ "resolution": [
+  {
+   "Adviser Name": "adviser_name",
+   "Date of Birth": "dob",
+   "Policy Start Date": "start_date",
+   "Product Name": "product",
+   "Risk Benefit Type": "product_type",
+   "Payment Frequency": "premium_frequency",
+   "Policy Premium": "annual_premium",
+   "Renew Commission Rate AMS": "renewal_comm"
+  }
+ ],
+ "neos": [
+  {
+   "Adviser": "adviser_name",
+   "Adviser code": "adviser_code",
+   "Policy no.": "policy_id",
+   "Status": "status",
+   "Inforce date": "start_date",
+   "Product": "product",
+   "Frequency": "premium_frequency",
+   "Total annualised premium": "annual_premium",
+   "Renewal comm. rate": "renewal_comm"
+  }
+ ],
+ "bt": []
+}

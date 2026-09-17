@@ -1,0 +1,1706 @@
+{
+  "version": "0.1.0",
+  "_about": "Single source of truth for PII stripping. Loaded by the browser worker AND by the server re-check so they cannot drift. Header matching is on TOKENS (never substrings). Order of evaluation: protectedOverrides (dob, age, state, postcode, gender, smoker always survive), then protectedPhrases are consumed so their tokens cannot trigger PII (Sum Insured, Initial Commission), then pii (PII WINS over protected), then protected, else unknown and value scanned.",
+  "blankPlaceholders": [
+    "",
+    "n/a",
+    "na",
+    "n.a.",
+    "n.a",
+    "-",
+    "--",
+    ".",
+    "unknown",
+    "unk",
+    "tba",
+    "tbc",
+    "null",
+    "none",
+    "nil",
+    "not provided",
+    "not supplied",
+    "not known",
+    "not applicable",
+    "#n/a",
+    "?"
+  ],
+  "titles": [
+    "mr",
+    "mrs",
+    "ms",
+    "miss",
+    "mx",
+    "dr",
+    "prof",
+    "professor",
+    "sir",
+    "dame",
+    "rev",
+    "reverend",
+    "hon",
+    "master",
+    "mstr",
+    "lady",
+    "lord",
+    "fr",
+    "sr",
+    "br",
+    "capt",
+    "captain"
+  ],
+  "suffixes": [
+    "jr",
+    "jnr",
+    "junior",
+    "sr",
+    "snr",
+    "senior",
+    "ii",
+    "iii",
+    "iv",
+    "esq",
+    "oam",
+    "am",
+    "ao",
+    "jp"
+  ],
+  "gluedHeaderWords": {
+    "firstname": "first name",
+    "lastname": "last name",
+    "middlename": "middle name",
+    "givenname": "given name",
+    "givennames": "given names",
+    "familyname": "family name",
+    "fullname": "full name",
+    "clientname": "client name",
+    "membername": "member name",
+    "ownername": "owner name",
+    "preferredname": "preferred name",
+    "prefname": "pref name",
+    "knownas": "known as",
+    "dateofbirth": "date of birth",
+    "birthdate": "birth date",
+    "lifeinsured": "life insured",
+    "lifeassured": "life assured",
+    "policyowner": "policy owner",
+    "policyholder": "policy holder",
+    "policynumber": "policy number",
+    "policyno": "policy no",
+    "policynum": "policy num",
+    "policyid": "policy id",
+    "emailaddress": "email address",
+    "mobilephone": "mobile phone",
+    "homephone": "home phone",
+    "workphone": "work phone",
+    "phonenumber": "phone number",
+    "mobilenumber": "mobile number",
+    "streetaddress": "street address",
+    "postaladdress": "postal address",
+    "zipcode": "zip code",
+    "postalcode": "postal code",
+    "pcode": "postcode",
+    "taxfilenumber": "tax file number",
+    "suminsured": "sum insured",
+    "sumassured": "sum assured",
+    "annualpremium": "annual premium",
+    "startdate": "start date",
+    "issuedate": "issue date",
+    "commencementdate": "commencement date",
+    "advisername": "adviser name",
+    "advisorname": "advisor name",
+    "advisercode": "adviser code",
+    "agentname": "agent name",
+    "agentcode": "agent code",
+    "productname": "product name",
+    "benefittype": "benefit type"
+  },
+  "protectedPhrases": [
+    [
+      "sum",
+      "insured"
+    ],
+    [
+      "sum",
+      "assured"
+    ],
+    [
+      "insured",
+      "amount"
+    ],
+    [
+      "amount",
+      "insured"
+    ],
+    [
+      "insured",
+      "benefit"
+    ],
+    [
+      "benefit",
+      "insured"
+    ],
+    [
+      "total",
+      "insured"
+    ],
+    [
+      "insured",
+      "value"
+    ],
+    [
+      "policy",
+      "number"
+    ],
+    [
+      "policy",
+      "no"
+    ],
+    [
+      "policy",
+      "num"
+    ],
+    [
+      "policy",
+      "id"
+    ],
+    [
+      "contract",
+      "number"
+    ],
+    [
+      "plan",
+      "number"
+    ],
+    [
+      "cover",
+      "number"
+    ],
+    [
+      "number",
+      "of",
+      "lives"
+    ],
+    [
+      "initial",
+      "premium"
+    ],
+    [
+      "initial",
+      "commission"
+    ],
+    [
+      "initial",
+      "comm"
+    ],
+    [
+      "payment",
+      "method"
+    ],
+    [
+      "occupation",
+      "class"
+    ],
+    [
+      "occ",
+      "class"
+    ],
+    [
+      "occupation",
+      "category"
+    ],
+    [
+      "occupation",
+      "rating"
+    ],
+    [
+      "in",
+      "force"
+    ],
+    [
+      "paid",
+      "to"
+    ],
+    [
+      "waiting",
+      "period"
+    ],
+    [
+      "benefit",
+      "period"
+    ],
+    [
+      "premium",
+      "type"
+    ],
+    [
+      "premium",
+      "structure"
+    ]
+  ],
+  "protectedOverrides": [
+    {
+      "kind": "age",
+      "valueKind": "number",
+      "seqs": [
+        [
+          "age"
+        ],
+        [
+          "anb"
+        ],
+        [
+          "age",
+          "next"
+        ],
+        [
+          "alb"
+        ]
+      ]
+    },
+    {
+      "kind": "dob",
+      "valueKind": "date",
+      "seqs": [
+        [
+          "date",
+          "of",
+          "birth"
+        ],
+        [
+          "dob"
+        ],
+        [
+          "d",
+          "o",
+          "b"
+        ],
+        [
+          "birth",
+          "date"
+        ],
+        [
+          "birthdate"
+        ],
+        [
+          "birthday"
+        ],
+        [
+          "birth",
+          "dt"
+        ],
+        [
+          "born"
+        ],
+        [
+          "dt",
+          "of",
+          "birth"
+        ]
+      ]
+    },
+    {
+      "kind": "postcode",
+      "valueKind": "code",
+      "seqs": [
+        [
+          "postcode"
+        ],
+        [
+          "post",
+          "code"
+        ],
+        [
+          "postal",
+          "code"
+        ],
+        [
+          "zip"
+        ],
+        [
+          "zip",
+          "code"
+        ]
+      ]
+    },
+    {
+      "kind": "state",
+      "valueKind": "code",
+      "seqs": [
+        [
+          "state"
+        ],
+        [
+          "province"
+        ],
+        [
+          "territory"
+        ]
+      ]
+    },
+    {
+      "kind": "gender",
+      "valueKind": "code",
+      "seqs": [
+        [
+          "gender"
+        ],
+        [
+          "sex"
+        ]
+      ]
+    },
+    {
+      "kind": "smoker",
+      "valueKind": "code",
+      "seqs": [
+        [
+          "smoker"
+        ],
+        [
+          "smoking"
+        ],
+        [
+          "smoke"
+        ],
+        [
+          "tobacco"
+        ]
+      ]
+    }
+  ],
+  "nameExemptQualifiers": [
+    "product",
+    "plan",
+    "benefit",
+    "insurer",
+    "adviser",
+    "advisor",
+    "agent",
+    "planner",
+    "broker",
+    "dealer",
+    "dealership",
+    "licensee",
+    "practice",
+    "branch",
+    "cover",
+    "option",
+    "rider",
+    "status",
+    "campaign",
+    "fund",
+    "scheme",
+    "portfolio",
+    "underwriter",
+    "writer",
+    "servicing",
+    "bdm",
+    "class",
+    "category",
+    "type",
+    "frequency",
+    "file",
+    "sheet",
+    "report",
+    "column",
+    "field"
+  ],
+  "pii": [
+    {
+      "evidence": "name",
+      "seqs": [
+        [
+          "name"
+        ],
+        [
+          "names"
+        ],
+        [
+          "surname"
+        ],
+        [
+          "forename"
+        ],
+        [
+          "nickname"
+        ],
+        [
+          "initials"
+        ],
+        [
+          "salutation"
+        ],
+        [
+          "title"
+        ],
+        [
+          "known",
+          "as"
+        ],
+        [
+          "preferred"
+        ],
+        [
+          "pref"
+        ],
+        [
+          "maiden"
+        ],
+        [
+          "alias"
+        ],
+        [
+          "middle",
+          "initial"
+        ],
+        [
+          "first",
+          "initial"
+        ]
+      ]
+    },
+    {
+      "evidence": "person",
+      "seqs": [
+        [
+          "life",
+          "insured"
+        ],
+        [
+          "life",
+          "assured"
+        ],
+        [
+          "lives",
+          "insured"
+        ],
+        [
+          "insured",
+          "person"
+        ],
+        [
+          "insured"
+        ],
+        [
+          "assured"
+        ],
+        [
+          "owner"
+        ],
+        [
+          "owners"
+        ],
+        [
+          "policy",
+          "holder"
+        ],
+        [
+          "policyholder"
+        ],
+        [
+          "holder"
+        ],
+        [
+          "payer"
+        ],
+        [
+          "payor"
+        ],
+        [
+          "beneficiary"
+        ],
+        [
+          "beneficiaries"
+        ],
+        [
+          "nominee"
+        ],
+        [
+          "trustee"
+        ],
+        [
+          "trustees"
+        ],
+        [
+          "guardian"
+        ],
+        [
+          "spouse"
+        ],
+        [
+          "partner"
+        ],
+        [
+          "dependant"
+        ],
+        [
+          "dependent"
+        ],
+        [
+          "applicant"
+        ],
+        [
+          "proposer"
+        ],
+        [
+          "customer"
+        ],
+        [
+          "client"
+        ],
+        [
+          "member"
+        ],
+        [
+          "employee"
+        ],
+        [
+          "director"
+        ],
+        [
+          "next",
+          "of",
+          "kin"
+        ],
+        [
+          "nok"
+        ],
+        [
+          "contact"
+        ],
+        [
+          "attention"
+        ],
+        [
+          "attn"
+        ],
+        [
+          "addressee"
+        ]
+      ]
+    },
+    {
+      "evidence": "employer",
+      "seqs": [
+        [
+          "employer"
+        ],
+        [
+          "occupation"
+        ],
+        [
+          "job"
+        ],
+        [
+          "job",
+          "title"
+        ],
+        [
+          "position"
+        ],
+        [
+          "profession"
+        ],
+        [
+          "business",
+          "name"
+        ],
+        [
+          "company",
+          "name"
+        ],
+        [
+          "entity",
+          "name"
+        ],
+        [
+          "trading",
+          "name"
+        ],
+        [
+          "super",
+          "fund",
+          "name"
+        ],
+        [
+          "smsf"
+        ]
+      ]
+    },
+    {
+      "evidence": "email",
+      "seqs": [
+        [
+          "email"
+        ],
+        [
+          "e",
+          "mail"
+        ],
+        [
+          "mail"
+        ]
+      ]
+    },
+    {
+      "evidence": "phone",
+      "seqs": [
+        [
+          "phone"
+        ],
+        [
+          "mobile"
+        ],
+        [
+          "mob"
+        ],
+        [
+          "cell"
+        ],
+        [
+          "cellphone"
+        ],
+        [
+          "telephone"
+        ],
+        [
+          "tel"
+        ],
+        [
+          "ph"
+        ],
+        [
+          "fax"
+        ],
+        [
+          "landline"
+        ],
+        [
+          "home",
+          "number"
+        ],
+        [
+          "work",
+          "number"
+        ],
+        [
+          "contact",
+          "number"
+        ],
+        [
+          "contact",
+          "no"
+        ]
+      ]
+    },
+    {
+      "evidence": "address",
+      "seqs": [
+        [
+          "address"
+        ],
+        [
+          "addr"
+        ],
+        [
+          "street"
+        ],
+        [
+          "suburb"
+        ],
+        [
+          "city"
+        ],
+        [
+          "town"
+        ],
+        [
+          "locality"
+        ],
+        [
+          "country"
+        ],
+        [
+          "apartment"
+        ],
+        [
+          "po",
+          "box"
+        ],
+        [
+          "postal"
+        ],
+        [
+          "residential"
+        ],
+        [
+          "mailing"
+        ],
+        [
+          "line",
+          "1"
+        ],
+        [
+          "line",
+          "2"
+        ],
+        [
+          "line",
+          "3"
+        ],
+        [
+          "address1"
+        ],
+        [
+          "address2"
+        ],
+        [
+          "address3"
+        ],
+        [
+          "dpid"
+        ],
+        [
+          "latitude"
+        ],
+        [
+          "longitude"
+        ],
+        [
+          "lat"
+        ],
+        [
+          "lng"
+        ],
+        [
+          "geocode"
+        ],
+        [
+          "unit",
+          "number"
+        ],
+        [
+          "unit",
+          "no"
+        ],
+        [
+          "flat"
+        ]
+      ]
+    },
+    {
+      "evidence": "government_id",
+      "seqs": [
+        [
+          "tfn"
+        ],
+        [
+          "tax",
+          "file"
+        ],
+        [
+          "tax",
+          "file",
+          "number"
+        ],
+        [
+          "medicare"
+        ],
+        [
+          "centrelink"
+        ],
+        [
+          "crn"
+        ],
+        [
+          "passport"
+        ],
+        [
+          "licence"
+        ],
+        [
+          "license"
+        ],
+        [
+          "driver"
+        ],
+        [
+          "drivers"
+        ],
+        [
+          "ssn"
+        ],
+        [
+          "nino"
+        ],
+        [
+          "national",
+          "insurance"
+        ],
+        [
+          "irn"
+        ],
+        [
+          "visa"
+        ],
+        [
+          "citizenship"
+        ]
+      ]
+    },
+    {
+      "evidence": "bank",
+      "seqs": [
+        [
+          "bsb"
+        ],
+        [
+          "bank"
+        ],
+        [
+          "account",
+          "number"
+        ],
+        [
+          "account",
+          "no"
+        ],
+        [
+          "account",
+          "name"
+        ],
+        [
+          "acct"
+        ],
+        [
+          "card"
+        ],
+        [
+          "credit",
+          "card"
+        ],
+        [
+          "cc"
+        ],
+        [
+          "iban"
+        ],
+        [
+          "swift"
+        ],
+        [
+          "direct",
+          "debit"
+        ],
+        [
+          "payment",
+          "account"
+        ],
+        [
+          "expiry",
+          "month"
+        ],
+        [
+          "cvv"
+        ]
+      ]
+    },
+    {
+      "evidence": "person_id",
+      "seqs": [
+        [
+          "client",
+          "number"
+        ],
+        [
+          "client",
+          "no"
+        ],
+        [
+          "client",
+          "id"
+        ],
+        [
+          "customer",
+          "number"
+        ],
+        [
+          "customer",
+          "id"
+        ],
+        [
+          "member",
+          "number"
+        ],
+        [
+          "member",
+          "no"
+        ],
+        [
+          "member",
+          "id"
+        ],
+        [
+          "life",
+          "insured",
+          "number"
+        ],
+        [
+          "life",
+          "number"
+        ],
+        [
+          "person",
+          "id"
+        ],
+        [
+          "party",
+          "id"
+        ],
+        [
+          "xplan",
+          "id"
+        ],
+        [
+          "entity",
+          "id"
+        ],
+        [
+          "crm",
+          "id"
+        ]
+      ]
+    },
+    {
+      "evidence": "free_text",
+      "seqs": [
+        [
+          "notes"
+        ],
+        [
+          "note"
+        ],
+        [
+          "comments"
+        ],
+        [
+          "comment"
+        ],
+        [
+          "remarks"
+        ],
+        [
+          "remark"
+        ],
+        [
+          "memo"
+        ],
+        [
+          "description",
+          "of",
+          "client"
+        ],
+        [
+          "file",
+          "note"
+        ],
+        [
+          "diary"
+        ],
+        [
+          "narrative"
+        ]
+      ]
+    },
+    {
+      "evidence": "health",
+      "seqs": [
+        [
+          "medical"
+        ],
+        [
+          "health"
+        ],
+        [
+          "diagnosis"
+        ],
+        [
+          "condition"
+        ],
+        [
+          "conditions"
+        ],
+        [
+          "exclusion"
+        ],
+        [
+          "exclusions"
+        ],
+        [
+          "claim",
+          "reason"
+        ],
+        [
+          "disability"
+        ],
+        [
+          "illness"
+        ],
+        [
+          "height"
+        ],
+        [
+          "weight"
+        ],
+        [
+          "bmi"
+        ]
+      ]
+    },
+    {
+      "evidence": "online",
+      "seqs": [
+        [
+          "username"
+        ],
+        [
+          "user",
+          "name"
+        ],
+        [
+          "login"
+        ],
+        [
+          "password"
+        ],
+        [
+          "ip"
+        ],
+        [
+          "ip",
+          "address"
+        ],
+        [
+          "linkedin"
+        ],
+        [
+          "facebook"
+        ],
+        [
+          "website"
+        ],
+        [
+          "url"
+        ]
+      ]
+    }
+  ],
+  "protected": [
+    {
+      "kind": "policy_number",
+      "valueKind": "id",
+      "seqs": [
+        [
+          "policy"
+        ],
+        [
+          "policy",
+          "number"
+        ],
+        [
+          "policy",
+          "no"
+        ],
+        [
+          "policy",
+          "num"
+        ],
+        [
+          "policy",
+          "id"
+        ],
+        [
+          "contract"
+        ],
+        [
+          "contract",
+          "number"
+        ],
+        [
+          "certificate"
+        ],
+        [
+          "plan",
+          "number"
+        ],
+        [
+          "plan",
+          "no"
+        ],
+        [
+          "reference",
+          "number"
+        ],
+        [
+          "cover",
+          "number"
+        ]
+      ]
+    },
+    {
+      "kind": "adviser",
+      "valueKind": "adviser",
+      "seqs": [
+        [
+          "adviser"
+        ],
+        [
+          "advisor"
+        ],
+        [
+          "agent"
+        ],
+        [
+          "planner"
+        ],
+        [
+          "broker"
+        ],
+        [
+          "dealer"
+        ],
+        [
+          "dealership"
+        ],
+        [
+          "licensee"
+        ],
+        [
+          "writer"
+        ],
+        [
+          "servicing"
+        ],
+        [
+          "practice"
+        ],
+        [
+          "bdm"
+        ]
+      ]
+    },
+    {
+      "kind": "insurer",
+      "valueKind": "text",
+      "seqs": [
+        [
+          "insurer"
+        ],
+        [
+          "underwriter"
+        ],
+        [
+          "carrier"
+        ],
+        [
+          "provider"
+        ],
+        [
+          "fund"
+        ]
+      ]
+    },
+    {
+      "kind": "product",
+      "valueKind": "text",
+      "seqs": [
+        [
+          "product"
+        ],
+        [
+          "plan"
+        ],
+        [
+          "scheme"
+        ],
+        [
+          "portfolio"
+        ],
+        [
+          "series"
+        ]
+      ]
+    },
+    {
+      "kind": "benefit",
+      "valueKind": "text",
+      "seqs": [
+        [
+          "benefit"
+        ],
+        [
+          "cover"
+        ],
+        [
+          "cover",
+          "type"
+        ],
+        [
+          "rider"
+        ],
+        [
+          "option"
+        ],
+        [
+          "options"
+        ],
+        [
+          "component"
+        ]
+      ]
+    },
+    {
+      "kind": "status",
+      "valueKind": "text",
+      "seqs": [
+        [
+          "status"
+        ],
+        [
+          "in",
+          "force"
+        ],
+        [
+          "inforce"
+        ],
+        [
+          "lapsed"
+        ],
+        [
+          "active"
+        ]
+      ]
+    },
+    {
+      "kind": "money",
+      "valueKind": "number",
+      "seqs": [
+        [
+          "premium"
+        ],
+        [
+          "prem"
+        ],
+        [
+          "commission"
+        ],
+        [
+          "comm"
+        ],
+        [
+          "renewal",
+          "comm"
+        ],
+        [
+          "sum"
+        ],
+        [
+          "sum",
+          "insured"
+        ],
+        [
+          "sum",
+          "assured"
+        ],
+        [
+          "amount"
+        ],
+        [
+          "amt"
+        ],
+        [
+          "value"
+        ],
+        [
+          "fee"
+        ],
+        [
+          "loading"
+        ],
+        [
+          "discount"
+        ],
+        [
+          "gst"
+        ],
+        [
+          "stamp",
+          "duty"
+        ],
+        [
+          "levy"
+        ],
+        [
+          "total"
+        ],
+        [
+          "balance"
+        ],
+        [
+          "gross"
+        ],
+        [
+          "net"
+        ],
+        [
+          "payable"
+        ],
+        [
+          "instalment"
+        ],
+        [
+          "installment"
+        ]
+      ]
+    },
+    {
+      "kind": "rate",
+      "valueKind": "number",
+      "seqs": [
+        [
+          "rate"
+        ],
+        [
+          "percent"
+        ],
+        [
+          "percentage"
+        ],
+        [
+          "pct"
+        ],
+        [
+          "multiple"
+        ],
+        [
+          "factor"
+        ]
+      ]
+    },
+    {
+      "kind": "date",
+      "valueKind": "date",
+      "seqs": [
+        [
+          "date"
+        ],
+        [
+          "commencement"
+        ],
+        [
+          "commenced"
+        ],
+        [
+          "inception"
+        ],
+        [
+          "issue"
+        ],
+        [
+          "issued"
+        ],
+        [
+          "start"
+        ],
+        [
+          "effective"
+        ],
+        [
+          "expiry"
+        ],
+        [
+          "expires"
+        ],
+        [
+          "renewal"
+        ],
+        [
+          "anniversary"
+        ],
+        [
+          "review"
+        ],
+        [
+          "paid",
+          "to"
+        ],
+        [
+          "lapse"
+        ],
+        [
+          "cancelled"
+        ],
+        [
+          "end"
+        ]
+      ]
+    },
+    {
+      "kind": "frequency",
+      "valueKind": "text",
+      "seqs": [
+        [
+          "frequency"
+        ],
+        [
+          "freq"
+        ],
+        [
+          "mode"
+        ],
+        [
+          "payment",
+          "method"
+        ],
+        [
+          "billing"
+        ]
+      ]
+    },
+    {
+      "kind": "term",
+      "valueKind": "text",
+      "seqs": [
+        [
+          "term"
+        ],
+        [
+          "waiting"
+        ],
+        [
+          "waiting",
+          "period"
+        ],
+        [
+          "benefit",
+          "period"
+        ],
+        [
+          "class"
+        ],
+        [
+          "occupation",
+          "class"
+        ],
+        [
+          "occ",
+          "class"
+        ],
+        [
+          "category"
+        ],
+        [
+          "type"
+        ],
+        [
+          "structure"
+        ],
+        [
+          "stepped"
+        ],
+        [
+          "level"
+        ],
+        [
+          "indexation"
+        ],
+        [
+          "cpi"
+        ],
+        [
+          "duration"
+        ],
+        [
+          "years"
+        ]
+      ]
+    },
+    {
+      "kind": "count",
+      "valueKind": "number",
+      "seqs": [
+        [
+          "count"
+        ],
+        [
+          "number",
+          "of"
+        ],
+        [
+          "units"
+        ],
+        [
+          "qty"
+        ],
+        [
+          "lives"
+        ]
+      ]
+    }
+  ],
+  "valueScan": {
+    "maxHeaderSearchRows": 40,
+    "unknownColumn": {
+      "dropOnAnyFormattedHit": true,
+      "nameHitsToDrop": 1,
+      "checksumRateToDrop": 0.5,
+      "bareDigitPhoneRateToDrop": 0.3,
+      "minCellsForRate": 4
+    },
+    "protectedTextColumn": {
+      "nameRateToFlag": 0.3,
+      "minNameHitsToFlag": 5
+    },
+    "personalEmailDomains": [
+      "gmail.com",
+      "googlemail.com",
+      "hotmail.com",
+      "hotmail.com.au",
+      "outlook.com",
+      "outlook.com.au",
+      "live.com",
+      "live.com.au",
+      "msn.com",
+      "yahoo.com",
+      "yahoo.com.au",
+      "ymail.com",
+      "icloud.com",
+      "me.com",
+      "mac.com",
+      "bigpond.com",
+      "bigpond.com.au",
+      "bigpond.net.au",
+      "optusnet.com.au",
+      "optus.com.au",
+      "tpg.com.au",
+      "iinet.net.au",
+      "internode.on.net",
+      "westnet.com.au",
+      "dodo.com.au",
+      "aapt.net.au",
+      "ozemail.com.au",
+      "adam.com.au",
+      "netspace.net.au",
+      "telstra.com",
+      "telstra.com.au",
+      "aol.com",
+      "protonmail.com",
+      "proton.me",
+      "gmx.com",
+      "fastmail.com",
+      "fastmail.fm",
+      "y7mail.com",
+      "rocketmail.com",
+      "qq.com",
+      "163.com",
+      "126.com",
+      "naver.com"
+    ],
+    "auStates": [
+      "NSW",
+      "VIC",
+      "QLD",
+      "SA",
+      "WA",
+      "TAS",
+      "NT",
+      "ACT"
+    ],
+    "auStateNames": {
+      "new south wales": "NSW",
+      "victoria": "VIC",
+      "queensland": "QLD",
+      "south australia": "SA",
+      "western australia": "WA",
+      "tasmania": "TAS",
+      "northern territory": "NT",
+      "australian capital territory": "ACT"
+    },
+    "streetTypes": [
+      "st",
+      "street",
+      "rd",
+      "road",
+      "ave",
+      "av",
+      "avenue",
+      "dr",
+      "drv",
+      "drive",
+      "ct",
+      "court",
+      "pl",
+      "place",
+      "cres",
+      "crescent",
+      "cr",
+      "hwy",
+      "highway",
+      "pde",
+      "parade",
+      "ln",
+      "lane",
+      "way",
+      "blvd",
+      "boulevard",
+      "tce",
+      "terrace",
+      "cl",
+      "close",
+      "gr",
+      "grove",
+      "cct",
+      "circuit",
+      "esp",
+      "esplanade",
+      "sq",
+      "square",
+      "rise",
+      "walk",
+      "mews",
+      "loop",
+      "track",
+      "trail",
+      "row",
+      "glen",
+      "vista",
+      "view",
+      "quay",
+      "promenade"
+    ]
+  },
+  "tokens": {
+    "columns": [
+      "ref_first",
+      "ref_last",
+      "ref_last_parts",
+      "ref_pref",
+      "ref_dob",
+      "ref_confidence"
+    ],
+    "ownerColumns": [
+      "own_ref_first",
+      "own_ref_last",
+      "own_ref_last_parts",
+      "own_ref_pref",
+      "own_ref_dob",
+      "own_ref_confidence"
+    ],
+    "hexLength": 32,
+    "domains": {
+      "given": "given",
+      "family": "family",
+      "dob": "dob"
+    }
+  }
+}

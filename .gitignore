@@ -38,3 +38,7 @@ uploads/
 
 # Claude temp files
 tmpclaude-*
+
+# v3 front end: sources and the BUILT app (static/app) are committed; dependencies are not
+frontend/node_modules/
+frontend/.vite/

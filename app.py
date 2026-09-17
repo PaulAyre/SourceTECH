@@ -2,14 +2,14 @@
 SourceTECH - Vendor Portfolio Upload Portal
 Main Flask application
 """
-from flask import Flask, request, render_template, redirect, url_for, jsonify, session
+from flask import Flask, request, render_template, redirect, url_for, jsonify, session, send_from_directory
 from functools import wraps
 from werkzeug.utils import secure_filename
 from validator import validate_portfolio_file
 from pii_stripper import strip_pii
 from pavtech_client import PavTechClient
 from excel_parser import extract_valuation_summary
-from email_service import send_dm_notification
+from email_service import send_dm_notification, send_email
 from dealtech_client import notify_data_received
 import sqlite3
 import secrets
@@ -27,7 +27,13 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '2.4.2'
+APP_VERSION = '3.0.0'
+
+# v3: the vendor page is a built React app (static/app) that strips personal
+# details IN THE BROWSER. Set SOURCETECH_UI=legacy to roll back to the v2 server
+# rendered page AND re-enable the raw /upload endpoint. In v3 mode the server
+# refuses raw files: it never sees, and never stores, an un-stripped upload.
+LEGACY_UI = os.environ.get('SOURCETECH_UI', '').strip().lower() == 'legacy'
 
 
 @app.context_processor
@@ -662,6 +668,13 @@ def upload_page(url_code):
         return render_template('error.html',
             message="Invalid or expired link"), 404
 
+    if not LEGACY_UI:
+        db.close()
+        # The React app reads everything it needs from /<url_code>/app-config.
+        resp = send_from_directory(os.path.join(app.root_path, 'static', 'app'), 'index.html')
+        resp.headers['Cache-Control'] = 'no-cache'
+        return resp
+
     # Get existing files for this vendor
     files = db.execute('''
         SELECT * FROM vendor_files
@@ -751,7 +764,14 @@ def handle_upload(url_code):
     """
     Upload a file to vendor's portfolio.
     Handles fuzzy matching for potential replacements.
+
+    LEGACY ONLY. This endpoint receives RAW files (names, contact details and all)
+    and strips them on the server. In v3 the browser strips before anything is
+    sent, so this route is closed unless SOURCETECH_UI=legacy.
     """
+    if not LEGACY_UI:
+        return jsonify({'error': 'This endpoint is closed. Files are prepared in the browser and sent to /clean-upload.',
+                        'code': 'raw_upload_closed'}), 410
     db = get_db()
     vendor = db.execute(
         "SELECT * FROM vendors WHERE url_code = ?",
@@ -1100,7 +1120,7 @@ def trigger_revaluation(url_code):
     })
 
 
-def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list, reference: str = None):
+def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list, reference: str = None, extra_notes: list = None):
     """Background batch processing with PavTECH."""
     db = get_db()
 
@@ -1108,7 +1128,13 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
         logger.info(f"Starting PavTECH batch processing for {vendor['vendor_name']} with {len(file_paths)} files")
 
         # Process through PavTECH
-        success, result = pavtech.process_batch(file_paths, vendor['vendor_name'])
+        # Pass the HubSpot deal id so PavTECH ties the run to the exact deal (its HubSpot
+        # attach and owner lookup) instead of fuzzy-matching the vendor name.
+        success, result = pavtech.process_batch(
+            file_paths, vendor['vendor_name'],
+            deal_id=(vendor.get('hubspot_deal_id') or None),
+            generator_name='SourceTECH',
+        )
 
         # Build file summary for email
         files_summary = [{
@@ -1160,6 +1186,7 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
                 valuation=valuation,
                 attachment_path=master_path,
                 pavtech_valuation=result.get('total_valuation'),
+                extra_notes=extra_notes,
             )
             if ok:
                 logger.info("DM valuation-complete email sent to %s (resend id=%s)",
@@ -1191,7 +1218,8 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
                 vendor_name=vendor['vendor_name'],
                 url_code=vendor['url_code'],
                 valuation=None,
-                error=error_msg
+                error=error_msg,
+                extra_notes=extra_notes,
             )
 
             logger.error(f"Failed: {vendor['vendor_name']} - {error_msg}")
@@ -1423,6 +1451,43 @@ def api_vendor_submissions(url_code):
 def home():
     """Home page - redirect to admin."""
     return redirect(url_for('admin_login'))
+
+
+def add_column_if_missing_public(db, table: str, column: str, ddl_type: str):
+    """ALTER-if-missing for modules outside init_db. Fails loudly, never no-ops."""
+    cols = {row[1] for row in db.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column in cols:
+        return
+    try:
+        db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}")
+        logger.info("Migration: added %s.%s", table, column)
+    except Exception as exc:
+        logger.error("MIGRATION FAILED adding %s.%s: %s", table, column, exc)
+        raise
+
+
+def insurer_profiles() -> dict:
+    """Expected export headers per insurer tile (insurer_profiles.json)."""
+    try:
+        with open(os.path.join(app.root_path, 'insurer_profiles.json'), encoding='utf-8') as fh:
+            return {k: v for k, v in json.load(fh).items() if not k.startswith('_')}
+    except (OSError, ValueError) as exc:
+        logger.error("insurer_profiles.json unreadable, prong A notes disabled: %s", exc)
+        return {}
+
+
+from types import SimpleNamespace  # noqa: E402
+from v3_api import register_v3  # noqa: E402
+
+v3 = register_v3(app, SimpleNamespace(
+    get_db=get_db, INSURERS=INSURERS, INSURER_KEYS=INSURER_KEYS, OTHER_KEY=OTHER_KEY, APP_VERSION=APP_VERSION,
+    insurer_label=insurer_label, clean_insurer_keys=clean_insurer_keys, insurer_profiles=insurer_profiles,
+    vendor_processing_state=vendor_processing_state, get_vendor_upload_dir=get_vendor_upload_dir,
+    validate_portfolio_file=validate_portfolio_file, notify_data_received=notify_data_received,
+    upload_url=_upload_url, build_working_set=build_working_set, send_dm_notification=send_dm_notification,
+    send_email=send_email, process_batch_with_pavtech=_process_batch_with_pavtech,
+    add_column_if_missing_public=add_column_if_missing_public,
+))
 
 
 @app.route('/health')

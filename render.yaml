@@ -34,6 +34,18 @@ services:
         sync: false   # must match DealTECH's WEBHOOK_SECRET exactly
       - key: PUBLIC_BASE_URL
         value: https://sourcetech.onrender.com
+      # v3: second, secret hash for the relationship codes. 32+ random characters.
+      # MUST be identical in ServiceTECH or purchased people will never match xPlan.
+      # NEVER rotate casually: vendor-side codes cannot be rebuilt. If unset, the
+      # codes are DROPPED (never stored half-hashed) and an alert is raised.
+      - key: REF_TOKEN_SECRET
+        sync: false
+      # Where "the browser stripper missed something" alerts go. Logged loudly either way.
+      - key: ALERT_EMAIL
+        sync: false
+      # Minutes to wait for files still uploading after the vendor presses Submit.
+      - key: SUBMIT_GRACE_MINUTES
+        value: "20"
     disk:
       name: sourcetech-data
       mountPath: /data
