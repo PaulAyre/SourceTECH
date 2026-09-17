@@ -30,7 +30,6 @@ def extract_valuation_summary(master_path: Path) -> Dict:
             - total_annual_premium
             - total_annual_commission
             - product_breakdown
-            - estimated_value
             - source_file
     """
     try:
@@ -42,7 +41,6 @@ def extract_valuation_summary(master_path: Path) -> Dict:
             'total_annual_premium': 0,
             'total_annual_commission': 0,
             'product_breakdown': {},
-            'estimated_value': 0,
             'source_file': master_path.name
         }
 
@@ -62,13 +60,9 @@ def extract_valuation_summary(master_path: Path) -> Dict:
             logger.warning("No summary sheet found, aggregating from data sheets")
             summary = _aggregate_from_sheets(master_path, summary)
 
-        # Calculate estimated portfolio value
-        if summary['total_annual_commission'] > 0:
-            # Commission multiple method
-            summary['estimated_value'] = summary['total_annual_commission'] * 3.5
-        elif summary['total_annual_premium'] > 0:
-            # Premium percentage method (assumes ~10% commission rate)
-            summary['estimated_value'] = summary['total_annual_premium'] * 0.35
+        # No locally computed value estimate: the only valuation figure that
+        # exists is PavTECH's own (process_batch total_valuation). v2.4.1 deleted
+        # the old commission x 3.5 / premium x 0.35 guess that lived here.
 
         wb.close()
 
@@ -86,7 +80,6 @@ def extract_valuation_summary(master_path: Path) -> Dict:
             'total_annual_premium': 0,
             'total_annual_commission': 0,
             'product_breakdown': {},
-            'estimated_value': 0,
             'source_file': master_path.name if master_path else 'unknown'
         }
 

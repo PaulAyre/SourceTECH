@@ -780,35 +780,6 @@ h1, h2, h3, h4, h5, h6 {
 .st-badge-warning { background: var(--warning-light); color: #856404; }
 
 
-/* --- Valuation Box --- */
-.st-valuation {
-    background: linear-gradient(135deg, var(--brand-green) 0%, var(--brand-green-mid) 100%);
-    color: var(--text-white);
-    padding: 2rem;
-    border-radius: var(--radius-lg);
-    text-align: center;
-    box-shadow: var(--shadow-green);
-}
-
-.st-valuation-label {
-    font-size: var(--font-size-base);
-    opacity: 0.9;
-    margin-bottom: 0.5rem;
-}
-
-.st-valuation-amount {
-    font-size: var(--font-size-3xl);
-    font-weight: 700;
-    letter-spacing: -0.025em;
-}
-
-.st-valuation-note {
-    font-size: var(--font-size-sm);
-    opacity: 0.8;
-    margin-top: 0.75rem;
-}
-
-
 /* --- Processing Summary --- */
 .st-summary {
     background: var(--bg-green-tint);
