@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '2.4.0'
+APP_VERSION = '2.4.2'
 
 
 @app.context_processor
@@ -500,6 +500,32 @@ def admin_vendor_detail(url_code):
 
     upload_url = request.url_root.rstrip('/') + '/' + url_code
     return render_template('admin/vendor_detail.html', vendor=vendor, submissions=submissions, upload_url=upload_url)
+
+
+@app.route('/admin/vendors/<url_code>/delete', methods=['POST'])
+@admin_required
+def admin_vendor_delete(url_code):
+    """v2.4.2 (23 Sep 2026): remove a vendor and everything under it. Admin only; the
+    upload link stops resolving (404). Used to clear the July test vendors; there was
+    no delete anywhere before."""
+    import shutil
+    db = get_db()
+    vendor = db.execute("SELECT * FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
+    if not vendor:
+        db.close()
+        return redirect(url_for('admin_vendors'))
+    vid = vendor['id']
+    db.execute("DELETE FROM vendor_files WHERE vendor_id = ?", (vid,))
+    db.execute("DELETE FROM submissions WHERE vendor_id = ?", (vid,))
+    db.execute("DELETE FROM vendors WHERE id = ?", (vid,))
+    db.commit()
+    db.close()
+    try:
+        shutil.rmtree(Path(UPLOADS_DIR) / url_code, ignore_errors=True)
+    except Exception as e:
+        app.logger.warning(f"vendor {url_code} deleted from DB but upload dir not removed: {e}")
+    app.logger.warning(f"ADMIN DELETE vendor {url_code} ({vendor['vendor_name']})")
+    return redirect(url_for('admin_vendors'))
 
 
 # ─────────────────────────────────────────────────────────────
