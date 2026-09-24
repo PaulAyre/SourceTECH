@@ -2,7 +2,7 @@
 DealTECH callback client.
 
 When a vendor uploads (and PII is stripped), SourceTECH calls DealTECH's
-`POST /webhook/sourcetech` so DealTECH auto-checks the Ver3 P1 "Inforce Data
+`POST /api/pavtech/webhook/sourcetech` so DealTECH auto-checks the Ver3 P1 "Inforce Data
 Received (PII removed)" checkbox on the matching deal.
 
 Best-effort: a DealTECH outage must never fail the vendor's upload. All errors
@@ -35,7 +35,11 @@ def notify_data_received(deal_id, file_url: str, timeout: float = 10.0) -> bool:
         logger.info("DEALTECH_API_URL not set — skipping DealTECH notify for deal %s", deal_id)
         return False
 
-    url = f"{DEALTECH_API_URL}/webhook/sourcetech"
+    # DealTECH serves this under its pavtech router: /api/pavtech/webhook/sourcetech
+    # (the bare /webhook/sourcetech path 405s against DealTECH's SPA catch-all; every
+    # vendor upload since v2 hit that 405, so the P1 "Inforce Data Received" tick
+    # never fired. Found by the 24 Sep 2026 smoke test on the ZZ TEST deal.)
+    url = f"{DEALTECH_API_URL}/api/pavtech/webhook/sourcetech"
     headers = {"Content-Type": "application/json"}
     if WEBHOOK_SECRET:
         headers["X-Webhook-Secret"] = WEBHOOK_SECRET

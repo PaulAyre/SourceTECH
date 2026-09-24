@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.0.0'
+APP_VERSION = '3.0.1'  # 3.0.1: DealTECH data-received webhook path fixed (/api/pavtech/webhook/sourcetech)
 
 # v3: the vendor page is a built React app (static/app) that strips personal
 # details IN THE BROWSER. Set SOURCETECH_UI=legacy to roll back to the v2 server
