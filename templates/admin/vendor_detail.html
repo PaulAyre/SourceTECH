@@ -48,6 +48,20 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-broadcast"></i> Live: what the vendor is uploading</span>
+                <small class="text-muted" id="live-updated">connecting</small>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0" id="live-files">
+                    <thead><tr><th>File</th><th>Insurer</th><th>Status</th><th>Policies</th><th>Issues raised</th><th>Uploaded</th></tr></thead>
+                    <tbody><tr><td colspan="6" class="text-center text-muted py-3">Waiting for the first upload</td></tr></tbody>
+                </table>
+            </div>
+            <div class="card-footer small text-muted" id="live-pavtech">No submission to PavTECH yet</div>
+        </div>
+
         <div class="card">
             <div class="card-header">
                 <i class="bi bi-clock-history"></i> Submission History
@@ -128,6 +142,44 @@
 
 {% block scripts %}
 <script>
+// v2.5.0: live panel, polls live.json every 5 seconds so the account manager can watch
+// the vendor's files land and the issues raised on each, as it happens.
+(function () {
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const badge = (s) => {
+        const m = {uploaded: 'bg-info', processing: 'bg-info', complete: 'bg-success', valued: 'bg-success', error: 'bg-danger', validation_failed: 'bg-warning'};
+        return '<span class="badge ' + (m[s] || 'bg-secondary') + '">' + esc(s || 'unknown') + '</span>';
+    };
+    let seen = 0;
+    async function tick() {
+        try {
+            const r = await fetch('{{ url_for("admin_vendor_live", url_code=vendor.url_code) }}', {cache: 'no-store'});
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            const tb = document.querySelector('#live-files tbody');
+            if (!d.files.length) {
+                tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Waiting for the first upload</td></tr>';
+            } else {
+                tb.innerHTML = d.files.map((f) => {
+                    const issues = [].concat(f.warnings || []).concat((f.pii_removed || []).map((c) => 'PII column removed: ' + c))
+                        .concat((f.pii_anonymized || []).map((c) => 'PII column anonymised: ' + c));
+                    const issuesHtml = issues.length ? '<ul class="mb-0 ps-3 small">' + issues.map((i) => '<li>' + esc(i) + '</li>').join('') + '</ul>' : '<span class="text-muted small">none</span>';
+                    return '<tr' + (d.files.length > seen ? ' class="table-success"' : '') + '><td>' + esc(f.filename) + '</td><td>' + esc(f.insurer || '?') + '</td><td>' + badge(f.status) + '</td><td>' + esc(f.policy_count == null ? '-' : f.policy_count) + '</td><td>' + issuesHtml + '</td><td class="small text-muted">' + esc(f.uploaded_at) + '</td></tr>';
+                }).join('');
+                seen = d.files.length;
+            }
+            const sub = d.submissions[0];
+            document.getElementById('live-pavtech').textContent = sub
+                ? 'PavTECH: ' + (sub.pavtech_status || 'queued') + (sub.pavtech_batch_id ? ' (run ' + sub.pavtech_batch_id + ')' : '') + ', submitted ' + sub.submitted_at + (sub.reference ? ', reference ' + sub.reference : '') + (sub.errors ? ', errors: ' + sub.errors : '')
+                : 'No submission to PavTECH yet (files are held until the vendor presses Review and Submit)';
+            document.getElementById('live-updated').textContent = 'live, updated ' + new Date().toLocaleTimeString();
+        } catch (e) {
+            document.getElementById('live-updated').textContent = 'live update failed: ' + e.message;
+        }
+    }
+    tick(); setInterval(tick, 5000);
+})();
+
 function copyLink() {
     const input = document.getElementById('upload-url');
     input.select();

@@ -485,6 +485,59 @@ def admin_vendor_created(url_code):
     return render_template('admin/vendor_created.html', vendor=vendor, upload_url=upload_url)
 
 
+@app.route('/admin/vendors/<url_code>/live.json')
+@admin_required
+def admin_vendor_live(url_code):
+    """v2.5.0 (Paul, 24 Sep 2026): what the vendor is doing RIGHT NOW, for the admin page's
+    live panel. Every file as it lands (status, insurer, policy count, the validation
+    warnings and PII columns removed, i.e. the same issues PavTECH's first stage raises),
+    every submission with its PavTECH status. Polled every 5 seconds by vendor_detail.html."""
+    db = get_db()
+    vendor = db.execute("SELECT * FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
+    if not vendor:
+        db.close()
+        return jsonify({'error': 'no such vendor'}), 404
+    files = db.execute("SELECT * FROM vendor_files WHERE vendor_id = ? ORDER BY uploaded_at DESC", (vendor['id'],)).fetchall()
+    subs = db.execute("SELECT * FROM submissions WHERE vendor_id = ? ORDER BY submitted_at DESC", (vendor['id'],)).fetchall()
+    db.close()
+
+    def _j(v, default):
+        try:
+            return json.loads(v) if v else default
+        except Exception:
+            return default
+
+    out_files = []
+    for f in files:
+        d = dict(f)
+        pii = _j(d.get('pii_report'), {})
+        out_files.append({
+            'filename': d.get('original_filename') or d.get('filename'),
+            'insurer': d.get('insurer'),
+            'status': d.get('status'),
+            'uploaded_at': d.get('uploaded_at'),
+            'policy_count': d.get('policy_count'),
+            'size': d.get('file_size'),
+            'warnings': _j(d.get('validation_warnings'), []),
+            'pii_removed': pii.get('columns_removed', []),
+            'pii_anonymized': pii.get('columns_anonymized', []),
+            'summary': _j(d.get('processing_summary'), []),
+        })
+    out_subs = [{
+        'submitted_at': dict(s_)['submitted_at'], 'reference': dict(s_).get('reference'),
+        'pavtech_status': dict(s_).get('pavtech_status'), 'pavtech_batch_id': dict(s_).get('pavtech_batch_id'),
+        'file_count': dict(s_).get('file_count'), 'policy_count': dict(s_).get('policy_count'),
+        'errors': dict(s_).get('validation_errors'),
+    } for s_ in subs]
+    return jsonify({
+        'vendor': {'name': vendor['vendor_name'], 'status': vendor['status'],
+                   'last_submission_at': vendor['last_submission_at'],
+                   'hubspot_deal_id': vendor['hubspot_deal_id'] if 'hubspot_deal_id' in vendor.keys() else None},
+        'files': out_files, 'submissions': out_subs,
+        'server_time': datetime.utcnow().isoformat() + 'Z',
+    })
+
+
 @app.route('/admin/vendors/<url_code>')
 @admin_required
 def admin_vendor_detail(url_code):
