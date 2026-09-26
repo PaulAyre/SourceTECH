@@ -27,7 +27,18 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.0.1'  # 3.0.1: DealTECH data-received webhook path fixed (/api/pavtech/webhook/sourcetech)
+APP_VERSION = '3.0.2'  # 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+
+
+def pavtech_run_url(vendor_name, batch_id, base=None):
+    """3.0.2 (Paul, 26 Sep 2026): deep link into the PavTECH web app for one run. PavTECH v3.353
+    restores a run from the URL hash (#vendor=<run directory>&batch=<batch id>); the run
+    directory is this vendor's name as SourceTECH sent it."""
+    from urllib.parse import quote
+    if not vendor_name or not batch_id:
+        return ''
+    root = (base or PAVTECH_API_URL or '').rstrip('/')
+    return f"{root}/#vendor={quote(str(vendor_name))}&batch={quote(str(batch_id))}"
 
 # v3: the vendor page is a built React app (static/app) that strips personal
 # details IN THE BROWSER. Set SOURCETECH_UI=legacy to roll back to the v2 server
@@ -558,7 +569,8 @@ def admin_vendor_detail(url_code):
     db.close()
 
     upload_url = request.url_root.rstrip('/') + '/' + url_code
-    return render_template('admin/vendor_detail.html', vendor=vendor, submissions=submissions, upload_url=upload_url)
+    return render_template('admin/vendor_detail.html', vendor=vendor, submissions=submissions, upload_url=upload_url,
+                           pavtech_base=(PAVTECH_API_URL or '').rstrip('/'), pavtech_run_url=pavtech_run_url)
 
 
 @app.route('/admin/vendors/<url_code>/delete', methods=['POST'])

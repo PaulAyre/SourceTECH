@@ -74,6 +74,7 @@
                             <th>Status</th>
                             <th>Policies</th>
                             <th>Submitted</th>
+                            <th>PavTECH</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -100,6 +101,7 @@
                             </td>
                             <td>{{ sub.policy_count or '-' }}</td>
                             <td>{{ sub.submitted_at }}</td>
+                            <td>{% if sub.pavtech_batch_id %}<a href="{{ pavtech_run_url(vendor.vendor_name, sub.pavtech_batch_id) }}" target="_blank" rel="noopener">Open run {{ sub.pavtech_batch_id }}</a>{% else %}-{% endif %}</td>
                         </tr>
                         {% else %}
                         <tr>
@@ -169,8 +171,13 @@
                 seen = d.files.length;
             }
             const sub = d.submissions[0];
-            document.getElementById('live-pavtech').textContent = sub
-                ? 'PavTECH: ' + (sub.pavtech_status || 'queued') + (sub.pavtech_batch_id ? ' (run ' + sub.pavtech_batch_id + ')' : '') + ', submitted ' + sub.submitted_at + (sub.reference ? ', reference ' + sub.reference : '') + (sub.errors ? ', errors: ' + sub.errors : '')
+            const PAVTECH_BASE = {{ pavtech_base|tojson }};
+            const VENDOR_NAME = {{ vendor.vendor_name|tojson }};
+            const runLink = (batch) => PAVTECH_BASE && batch
+                ? ' <a href="' + PAVTECH_BASE + '/#vendor=' + encodeURIComponent(VENDOR_NAME) + '&batch=' + encodeURIComponent(batch) + '" target="_blank" rel="noopener">Open in PavTECH</a>'
+                : '';
+            document.getElementById('live-pavtech').innerHTML = sub
+                ? esc('PavTECH: ' + (sub.pavtech_status || 'queued') + (sub.pavtech_batch_id ? ' (run ' + sub.pavtech_batch_id + ')' : '') + ', submitted ' + sub.submitted_at + (sub.reference ? ', reference ' + sub.reference : '') + (sub.errors ? ', errors: ' + sub.errors : '')) + runLink(sub.pavtech_batch_id)
                 : 'No submission to PavTECH yet (files are held until the vendor presses Review and Submit)';
             document.getElementById('live-updated').textContent = 'live, updated ' + new Date().toLocaleTimeString();
         } catch (e) {
