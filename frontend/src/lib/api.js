@@ -17,13 +17,14 @@ export const submitIntent = (clientIds) => fetch(`${base}/submit-intent`, { meth
 export const submitFinalize = () => fetch(`${base}/submit-finalize`, { method: 'POST' }).then(json);
 
 /** XHR (not fetch) so the vendor gets a real upload percentage. */
-export function uploadClean({ cleanFile, insurerKey, clientId, safeReport, onProgress }) {
+export function uploadClean({ cleanFile, insurerKey, clientId, safeReport, nameKey, onProgress }) {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append('file', cleanFile, cleanFile.name);
     form.append('insurer', insurerKey);
     form.append('client_id', clientId);
     form.append('safe_report', JSON.stringify(safeReport || {}));
+    if (nameKey) form.append('name_key', nameKey);   // fingerprint of the file name, never the name
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${base}/clean-upload`);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
@@ -36,4 +37,11 @@ export function uploadClean({ cleanFile, insurerKey, clientId, safeReport, onPro
     xhr.onerror = () => reject(Object.assign(new Error('Connection lost'), { code: 'network' }));
     xhr.send(form);
   });
+}
+
+/** 3.2.0: a one-way fingerprint of a file's name for this link (the name itself is never sent). */
+export async function nameKeyOf(name) {
+  const bytes = new TextEncoder().encode(`${URL_CODE}|${String(name || '').trim().toLowerCase()}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }

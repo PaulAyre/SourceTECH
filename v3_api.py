@@ -69,6 +69,7 @@ def register_v3(app, d):
         d.add_column_if_missing_public(db, 'vendor_files', 'note_codes', 'TEXT')
         d.add_column_if_missing_public(db, 'vendor_files', 'strip_report', 'TEXT')
         d.add_column_if_missing_public(db, 'vendor_files', 'content_sha', 'TEXT')  # 3.0.4: cell-value fingerprint
+        d.add_column_if_missing_public(db, 'vendor_files', 'name_key', 'TEXT')     # 3.2.0: fingerprint of the vendor's file name
         db.execute('''
             CREATE TABLE IF NOT EXISTS submission_intents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,6 +123,7 @@ def register_v3(app, d):
             'uploaded_at': row['uploaded_at'],
             'client_id': row['client_id'],
             'notes': notes,
+            'name_key': row['name_key'] if 'name_key' in row.keys() else None,   # 3.2.0
         }
 
     def alert(subject: str, body: str):
@@ -200,6 +202,11 @@ def register_v3(app, d):
         if insurer_key not in d.INSURER_KEYS:
             insurer_key = d.OTHER_KEY
         client_id = request.form.get('client_id') or ''
+        # 3.2.0: a one-way fingerprint of the vendor's own file name (the name itself never
+        # reaches us), so a later visit can tell them a file of that name is already here
+        name_key = (request.form.get('name_key') or '').strip().lower()
+        if not re.fullmatch(r'[0-9a-f]{64}', name_key):
+            name_key = None
         if not _CLIENT_ID_RE.match(client_id):
             client_id = secrets.token_urlsafe(9)
         try:
@@ -275,11 +282,11 @@ def register_v3(app, d):
         db.execute('''
             INSERT INTO vendor_files
             (vendor_id, filename, original_filename, file_path, file_size, status, validation_warnings,
-             pii_report, policy_count, processing_summary, insurer, sha256, client_id, note_codes, strip_report)
-            VALUES (?, ?, ?, ?, ?, 'valid', '[]', ?, ?, '[]', ?, ?, ?, ?, ?)
+             pii_report, policy_count, processing_summary, insurer, sha256, client_id, note_codes, strip_report, name_key)
+            VALUES (?, ?, ?, ?, ?, 'valid', '[]', ?, ?, '[]', ?, ?, ?, ?, ?, ?)
         ''', (vendor['id'], final_name, final_name, str(final_path), final_path.stat().st_size,
               json.dumps({'client_side': True, 'columns_removed': strip_report.get('columnsRemoved')}),
-              policy_count, insurer_key, sha, client_id, json.dumps(notes), json.dumps(strip_report)))
+              policy_count, insurer_key, sha, client_id, json.dumps(notes), json.dumps(strip_report), name_key))
         db.execute("UPDATE vendors SET last_submission_at = CURRENT_TIMESTAMP WHERE id = ?", (vendor['id'],))
         db.commit()
         row = db.execute("SELECT * FROM vendor_files WHERE vendor_id = ? AND sha256 = ?", (vendor['id'], sha)).fetchone()

@@ -5,14 +5,16 @@ import { noteText, FAILURES } from '../lib/notes.js';
 
 function FileRow({ item, insurer, onRemove }) {
   const pct = Math.round((item.fraction || 0) * 100);
-  const tone = item.state === 'failed' ? 'bg-red-50 border-red-200' : item.state === 'received' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200';
-  const text = item.state === 'failed' ? 'text-red-800' : item.state === 'received' ? 'text-green-800' : 'text-blue-800';
+  const dup = item.state === 'duplicate';   // 3.2.0: same name as a file already sent
+  const tone = item.state === 'failed' ? 'bg-red-50 border-red-200' : dup ? 'bg-amber-50 border-amber-200' : item.state === 'received' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200';
+  const text = item.state === 'failed' ? 'text-red-800' : dup ? 'text-amber-800' : item.state === 'received' ? 'text-green-800' : 'text-blue-800';
   const notes = (item.notes || []).map((n) => noteText(n, { insurerName: insurer.name })).filter(Boolean);
   return (
     <div className={`border rounded px-3 py-2 ${tone}`}>
       <div className="flex items-center gap-2">
         {item.state === 'received' ? <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
           : item.state === 'failed' ? <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+          : dup ? <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
           : <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin flex-shrink-0" />}
         <FileSpreadsheet className={`w-4 h-4 flex-shrink-0 ${item.state === 'received' ? 'text-green-600' : item.state === 'failed' ? 'text-red-400' : 'text-blue-500'}`} />
         <span className={`text-xs flex-1 truncate ${text}`} title={item.displayName}>{item.displayName}</span>
@@ -21,6 +23,7 @@ function FileRow({ item, insurer, onRemove }) {
           {item.state === 'uploading' && `Sending ${Math.max(0, Math.round(((item.fraction || 0.5) - 0.5) * 200))}%`}
           {item.state === 'received' && 'Received'}
           {item.state === 'failed' && 'Not sent'}
+          {dup && 'Already uploaded'}
         </span>
         <button onClick={() => onRemove(item.clientId)} className={`${text} opacity-70 hover:opacity-100`} aria-label={`Remove ${item.displayName}`}>
           <X className="w-3.5 h-3.5" />
@@ -30,7 +33,8 @@ function FileRow({ item, insurer, onRemove }) {
         <div className="mt-1.5 h-1 rounded bg-blue-100 overflow-hidden"><div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${pct}%` }} /></div>
       )}
       {item.state === 'failed' && <p className="mt-1 text-xs text-red-700">{FAILURES[item.error] || FAILURES.unreadable_file}</p>}
-      {item.state !== 'failed' && (item.removedColumns > 0 || notes.length > 0) && (
+      {dup && <p className="mt-1 text-xs text-amber-800">You have already uploaded a file called “{item.displayName}”, so it was not sent again. If this is a newer version, remove the earlier one first and then add this again.</p>}
+      {item.state !== 'failed' && !dup && (item.removedColumns > 0 || notes.length > 0) && (
         <ul className="mt-1 space-y-0.5">
           {item.removedColumns > 0 && (
             <li className="text-xs text-gray-600 flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-green-700" />{item.removedColumns} column{item.removedColumns === 1 ? '' : 's'} of personal details removed on your computer</li>
@@ -46,7 +50,7 @@ export default function FileUploadZone({ insurer, items, onAddFiles, onRemove })
   const [dragging, setDragging] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const inputRef = useRef();
-  const done = items.length > 0 && items.every((i) => i.state === 'received');
+  const done = items.some((i) => i.state === 'received') && items.every((i) => i.state === 'received' || i.state === 'duplicate');
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4">

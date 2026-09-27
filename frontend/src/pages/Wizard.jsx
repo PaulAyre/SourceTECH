@@ -31,7 +31,7 @@ export default function Wizard({ config, uploads }) {
   const toggle = (key) => setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   const shown = config.insurers.filter((i) => selected.includes(i.key));
   const itemsFor = (key) => items.filter((i) => i.insurerKey === key);
-  const sendable = items.filter((i) => i.state !== 'failed');
+  const sendable = items.filter((i) => i.state !== 'failed' && i.state !== 'duplicate');
 
   // Submit is available the moment there is anything to send, finished or not.
   const submit = async () => {

@@ -148,7 +148,7 @@ def test_vendor_never_sees_valuation_data_on_any_v3_route(ctx):
     cfg = c.get('/V3TEST01/app-config').get_json()
     assert cfg['vendor_name'] == 'Pytest Wealth' and len(cfg['insurers']) >= 9 and cfg['app_key'].startswith('iplus-ref-v1')
     assert cfg['latest_submission']['state'] in ('processed', 'needs_attention', 'processing', 'pending')
-    assert set(cfg['files'][0]) == {'id', 'name', 'insurer', 'insurer_name', 'policy_count', 'uploaded_at', 'client_id', 'notes'}
+    assert set(cfg['files'][0]) == {'id', 'name', 'insurer', 'insurer_name', 'policy_count', 'uploaded_at', 'client_id', 'notes', 'name_key'}
 
 
 def wait_for(cond, secs=5):
@@ -229,3 +229,20 @@ def test_resubmit_listing_a_re_uploaded_duplicate_runs_straight_away(ctx):
     assert wait_for(lambda: len(calls['batches']) == 2), 'both ids arrived: runs now, not after 20 minutes'
     notes = ' '.join(' '.join(e.get('extra_notes') or []) for e in calls['emails'])
     assert 'never finished uploading' not in notes
+
+
+def test_file_name_fingerprint_is_kept_and_handed_back(ctx):
+    """3.2.0: the vendor page sends a fingerprint of the file name (never the name); a later
+    visit gets it back so a same-name file is not sent twice."""
+    st, c, d, calls = ctx
+    key = 'a' * 64
+    data = {'file': (io.BytesIO((FIX / 'aia_1.xlsx').read_bytes()), 'aia_1.xlsx'), 'insurer': 'aia', 'client_id': 'cid-000001',
+            'safe_report': json.dumps({'rulesVersion': '0.1.0', 'notes': []}), 'name_key': key}
+    r = c.post('/V3TEST01/clean-upload', data=data, content_type='multipart/form-data')
+    assert r.status_code == 200 and r.get_json()['file']['name_key'] == key
+    cfg = c.get('/V3TEST01/app-config').get_json()
+    assert [f['name_key'] for f in cfg['files']] == [key]
+    bad = {'file': (io.BytesIO((FIX / 'tal_1.xlsx').read_bytes()), 'tal_1.xlsx'), 'insurer': 'tal', 'client_id': 'cid-000002',
+           'safe_report': json.dumps({'rulesVersion': '0.1.0', 'notes': []}), 'name_key': 'Smith J policies.xlsx'}
+    r = c.post('/V3TEST01/clean-upload', data=bad, content_type='multipart/form-data')
+    assert r.get_json()['file']['name_key'] is None, 'anything that is not a fingerprint is never stored'

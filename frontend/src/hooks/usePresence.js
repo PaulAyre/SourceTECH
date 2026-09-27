@@ -13,7 +13,7 @@ export function usePresence({ step, selected, items }) {
   latest.current = {
     step,
     selected,
-    items: items.map((i) => ({ id: i.clientId, insurer: i.insurerKey, state: i.state, fraction: Math.round((i.fraction || 0) * 100) / 100 })),
+    items: items.filter((i) => i.state !== 'duplicate').map((i) => ({ id: i.clientId, insurer: i.insurerKey, state: i.state, fraction: Math.round((i.fraction || 0) * 100) / 100 })),
   };
 
   const send = () => {
