@@ -85,6 +85,14 @@ def register_v3(app, d):
         # already hold. The duplicate branch used to MOVE the stored row's client_id to
         # the new upload, so a Submit that listed both ids never saw them all arrive and
         # waited the full grace period, then told the DM a file never finished uploading.
+        # 3.5.0: the files each valuation actually used, the DM's / vendor's changes to the
+        # next valuation's set, and each run's results fetched once from PavTECH.
+        db.execute('''CREATE TABLE IF NOT EXISTS run_files (reference TEXT NOT NULL, file_id INTEGER NOT NULL,
+                      PRIMARY KEY (reference, file_id))''')
+        db.execute('''CREATE TABLE IF NOT EXISTS set_overrides (vendor_id INTEGER NOT NULL, file_id INTEGER NOT NULL,
+                      action TEXT NOT NULL, PRIMARY KEY (vendor_id, file_id))''')
+        db.execute('''CREATE TABLE IF NOT EXISTS run_results (batch_id TEXT NOT NULL, vendor_id INTEGER NOT NULL,
+                      payload TEXT NOT NULL, PRIMARY KEY (vendor_id, batch_id))''')
         # 3.1.0: what the vendor's page is doing right now, for the admin's live board.
         # Ticked insurers and each file's stage and progress only: never a file name.
         db.execute('''
@@ -143,7 +151,8 @@ def register_v3(app, d):
         if not vendor:
             db.close()
             return jsonify({'error': 'Invalid link'}), 404
-        rows = db.execute("SELECT * FROM vendor_files WHERE vendor_id = ? ORDER BY uploaded_at ASC, id ASC", (vendor['id'],)).fetchall()
+        # 3.5.0: the vendor sees the set their next valuation will use (last run + this visit)
+        rows = sorted(d.next_set(db, vendor['id']), key=lambda r: (r['uploaded_at'] or '', r['id']))
         latest = db.execute('''SELECT reference, submitted_at, file_count, pavtech_status FROM submissions
                                WHERE vendor_id = ? ORDER BY submitted_at DESC LIMIT 1''', (vendor['id'],)).fetchone()
         pending = db.execute('''SELECT reference, created_at, client_ids FROM submission_intents
@@ -304,7 +313,11 @@ def register_v3(app, d):
         db = d.get_db()
         vendor = db.execute("SELECT * FROM vendors WHERE id = ?", (vendor_id,)).fetchone()
         duplicates = []
-        files, _total = d.build_working_set(db, vendor_id, duplicates=duplicates)
+        files = d.next_set(db, vendor_id, duplicates=duplicates)   # 3.5.0: last run + this visit +/- changes
+        for f in files:
+            db.execute("INSERT OR IGNORE INTO run_files (reference, file_id) VALUES (?, ?)", (reference, f['id']))
+        db.execute("DELETE FROM set_overrides WHERE vendor_id = ?", (vendor_id,))   # a new set starts from this run
+        db.commit()
         file_paths = [Path(f['file_path']) for f in files if Path(f['file_path']).exists()]
         extra = []
         for dup in duplicates:   # 3.0.4: same data counted once, and the DM is told
@@ -460,4 +473,4 @@ def register_v3(app, d):
         return jsonify({'success': True})
 
     sweep_overdue()          # on boot: pick up anything a restart interrupted
-    return {'sweep_overdue': sweep_overdue, 'maybe_finalize_for': maybe_finalize_for}
+    return {'sweep_overdue': sweep_overdue, 'maybe_finalize_for': maybe_finalize_for, 'start_processing': start_processing}

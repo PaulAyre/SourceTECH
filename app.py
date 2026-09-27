@@ -12,6 +12,7 @@ from excel_parser import extract_valuation_summary
 from email_service import send_dm_notification, send_email
 from dealtech_client import notify_data_received
 import sqlite3
+import requests
 import secrets
 import os
 import json
@@ -27,7 +28,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.4.0'  # 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.5.0'  # 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -603,14 +604,33 @@ def vendor_board(db, vendor):
             'policies': sum(x['policies'] for x in by_ins.get(k, [])),
             'progress': round(sum(prog) / len(prog), 2) if prog else None, 'in_flight': len(fl),
         })
+    all_files = {r['id']: dict(r) for r in db.execute("SELECT * FROM vendor_files WHERE vendor_id = ?", (v['id'],)).fetchall()}
+
+    def file_card(fid, origin=None):
+        f = all_files.get(fid)
+        if not f:
+            return None
+        k = f.get('insurer') or OTHER_KEY
+        cat = next((i for i in INSURERS if i['key'] == k), None)
+        return {'id': fid, 'name': f.get('original_filename'), 'policies': f.get('policy_count') or 0, 'insurer': k,
+                'insurer_name': cat['name'] if cat else 'Other / unassigned', 'badge': cat['badge'] if cat else '?',
+                'color': cat['color'] if cat else '#6b7280',
+                'logo': url_for('static', filename=f'images/insurers/{k}.png') if k in INSURER_LOGOS else None,
+                'download': url_for('admin_download_file', url_code=v['url_code'], file_id=fid), 'origin': origin}
+
     runs = []
     for sub in db.execute("SELECT * FROM submissions WHERE vendor_id = ? ORDER BY submitted_at DESC LIMIT 20", (v['id'],)).fetchall():
         sub = dict(sub)
+        ids, rebuilt = run_file_ids(db, v['id'], sub)
         runs.append({'reference': sub.get('reference'), 'status': sub.get('pavtech_status'), 'batch_id': sub.get('pavtech_batch_id'),
                      'submitted_at': sub.get('submitted_at'), 'policies': sub.get('policy_count'), 'files': sub.get('file_count'),
                      'errors': sub.get('validation_errors'),
-                     'url': pavtech_run_url(v['vendor_name'], sub['pavtech_batch_id']) if sub.get('pavtech_batch_id') else None})
+                     'url': pavtech_run_url(v['vendor_name'], sub['pavtech_batch_id']) if sub.get('pavtech_batch_id') else None,
+                     'file_list': [c for c in (file_card(i) for i in ids) if c], 'files_reconstructed': rebuilt,
+                     'results': run_results(db, v, sub.get('pavtech_batch_id')) if sub.get('pavtech_batch_id') else None})
     latest = runs[0] if runs else None
+    nxt, origin = next_set(db, v['id'], with_origin=True)
+    next_files = [c for c in (file_card(r['id'], origin.get(r['id'])) for r in nxt) if c]
     # 3.3.0: one row per file in the vendor's current session, from their page's reports,
     # joined to what landed (by the upload's client id) for the stored name and policy count.
     activity = []
@@ -640,6 +660,8 @@ def vendor_board(db, vendor):
              for i in INSURERS if i['key'] not in chosen]
     deal = v.get('hubspot_deal_id')
     return {
+        'next': {'files': next_files, 'policies': sum(f['policies'] for f in next_files),
+                 'running': v.get('status') == 'processing'},
         'activity': activity,
         'inbox': inbox,
         'vendor': {'name': v.get('deal_name') or v['vendor_name'], 'code': v['url_code'], 'status': v.get('status'), 'dm': v.get('dm_name'),
@@ -650,6 +672,83 @@ def vendor_board(db, vendor):
                    'expected': len(expected), 'expected_received': sum(1 for s_ in slots if s_['expected'] and s_['files'])},
         'server_time': datetime.utcnow().isoformat() + 'Z',
     }
+
+
+_RESULT_MISS: dict = {}
+
+
+def run_results(db, vendor, batch_id):
+    """3.5.0: a run's basic results (policies, commission, book value, multiple), read once
+    from PavTECH and kept. Never shown to vendors: admin board only."""
+    import time as _t
+    row = db.execute("SELECT payload FROM run_results WHERE vendor_id = ? AND batch_id = ?", (vendor['id'], batch_id)).fetchone() \
+        if _has(db, 'run_results') else None
+    if row:
+        return json.loads(row['payload'])
+    if _RESULT_MISS.get((vendor['id'], batch_id), 0) > _t.time() or not PAVTECH_API_URL:
+        return None
+    try:
+        r = requests.get(f"{PAVTECH_API_URL.rstrip('/')}/api/batch/status",
+                         params={'vendor_name': vendor['vendor_name'], 'batch_id': batch_id}, timeout=6)
+        d = r.json() if r.status_code == 200 else {}
+    except Exception as e:
+        logger.warning("run results for %s/%s: %s", vendor['vendor_name'], batch_id, e)
+        d = {}
+    files = (d.get('files') or {}).values()
+    if not d.get('all_complete') or not files:
+        _RESULT_MISS[(vendor['id'], batch_id)] = _t.time() + 60
+        return None
+    done = [f for f in files if f.get('status') == 'complete']
+    com = sum(f.get('total_commission') or 0 for f in done)
+    val = sum(f.get('valuation') or 0 for f in done)
+    res = {'policies': sum(f.get('records') or 0 for f in done), 'commission': round(com, 2), 'value': round(val, 2),
+           'multiple': round(val / com, 2) if com else None, 'files_valued': len(done), 'files_failed': len(list(files)) - len(done)}
+    db.execute("INSERT OR REPLACE INTO run_results (batch_id, vendor_id, payload) VALUES (?, ?, ?)", (batch_id, vendor['id'], json.dumps(res)))
+    db.commit()
+    return res
+
+
+@app.route('/admin/vendors/<url_code>/set', methods=['POST'])
+@admin_required
+def admin_set_change(url_code):
+    """3.5.0: the DM adds a file (from an earlier run) to the next valuation, or takes one out."""
+    body = request.get_json(silent=True) or {}
+    action = body.get('action')
+    try:
+        file_id = int(body.get('file_id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'file_id required'}), 400
+    if action not in ('include', 'exclude'):
+        return jsonify({'error': 'action must be include or exclude'}), 400
+    db = get_db()
+    v = db.execute("SELECT * FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
+    if not v or not db.execute("SELECT 1 FROM vendor_files WHERE id = ? AND vendor_id = ?", (file_id, v['id'])).fetchone():
+        db.close()
+        return jsonify({'error': 'no such file'}), 404
+    db.execute("INSERT OR REPLACE INTO set_overrides (vendor_id, file_id, action) VALUES (?, ?, ?)", (v['id'], file_id, action))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+
+@app.route('/admin/vendors/<url_code>/run', methods=['POST'])
+@admin_required
+def admin_run_valuation(url_code):
+    """3.5.0: run the valuation again on the next set (e.g. after adding a forgotten file)."""
+    import secrets as _s
+    db = get_db()
+    v = db.execute("SELECT * FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
+    if not v:
+        db.close()
+        return jsonify({'error': 'no such vendor'}), 404
+    files = next_set(db, v['id'])
+    db.close()
+    if not files:
+        return jsonify({'error': 'There are no files in the next valuation'}), 400
+    reference = f"ST-{datetime.now().strftime('%Y%m%d')}-{_s.token_hex(2).upper()}"
+    v3['start_processing'](v['id'], reference, 0, len(files))
+    logger.info("admin re-run for %s: %s with %s files", url_code, reference, len(files))
+    return jsonify({'success': True, 'reference': reference, 'files': len(files)})
 
 
 @app.route('/admin/vendors/<url_code>/files/<int:file_id>/download')
@@ -860,6 +959,70 @@ def build_working_set(db, vendor_id: int, duplicates: list = None) -> tuple:
             seen_content[sha] = name
         working.append(f)
     return working, len(all_files)
+
+
+def _dedup(db, rows, duplicates=None):
+    """Newest first: the latest upload of each name, then one file per distinct content."""
+    seen_names, seen_content, keep = set(), {}, []
+    for f in sorted(rows, key=lambda r: (r['uploaded_at'] or '', r['id']), reverse=True):
+        name = f['original_filename']
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+        sha = _content_sha(db, f) if f['file_path'] and Path(f['file_path']).exists() else None
+        if sha and sha in seen_content:
+            if duplicates is not None:
+                duplicates.append({'file': name, 'same_as': seen_content[sha]})
+            continue
+        if sha:
+            seen_content[sha] = name
+        keep.append(f)
+    return keep
+
+
+def _has(db, table):
+    return bool(db.execute("SELECT name FROM sqlite_master WHERE name = ?", (table,)).fetchone())
+
+
+def run_file_ids(db, vendor_id, sub, dedup=True):
+    """The files a run used: recorded since 3.5.0, reconstructed for older runs (every file
+    uploaded before it was submitted, deduped the way the run did)."""
+    if sub['reference'] and _has(db, 'run_files'):
+        ids = [r['file_id'] for r in db.execute("SELECT file_id FROM run_files WHERE reference = ?", (sub['reference'],)).fetchall()]
+        if ids:
+            return ids, False
+    rows = db.execute("SELECT * FROM vendor_files WHERE vendor_id = ? AND uploaded_at <= ?", (vendor_id, sub['submitted_at'])).fetchall()
+    return [r['id'] for r in (_dedup(db, rows) if dedup else rows)], True
+
+
+def next_set(db, vendor_id, duplicates=None, with_origin=False):
+    """3.5.0 (Paul, 27 Sep): the files the next valuation uses. The last run's files plus
+    everything uploaded since, plus files the DM added from older runs, minus files the
+    vendor or the DM took out. With no run yet, every file (as before)."""
+    all_rows = {r['id']: r for r in db.execute("SELECT * FROM vendor_files WHERE vendor_id = ?", (vendor_id,)).fetchall()}
+    last = db.execute("SELECT * FROM submissions WHERE vendor_id = ? AND reference IS NOT NULL ORDER BY submitted_at DESC, id DESC LIMIT 1",
+                      (vendor_id,)).fetchone()
+    origin = {}
+    if last:
+        base, _ = run_file_ids(db, vendor_id, last, dedup=False)   # the final pass de-duplicates and reports
+        for fid in base:
+            origin[fid] = 'last_run'
+        for fid, r in all_rows.items():
+            if (r['uploaded_at'] or '') > (last['submitted_at'] or '') and fid not in origin:
+                origin[fid] = 'new'
+    else:
+        for fid in all_rows:
+            origin[fid] = 'new'
+    if _has(db, 'set_overrides'):
+        for o in db.execute("SELECT file_id, action FROM set_overrides WHERE vendor_id = ?", (vendor_id,)).fetchall():
+            if o['action'] == 'include' and o['file_id'] in all_rows:
+                origin.setdefault(o['file_id'], 'added')
+            elif o['action'] == 'exclude':
+                origin.pop(o['file_id'], None)
+    keep = _dedup(db, [all_rows[i] for i in origin if i in all_rows], duplicates)
+    if with_origin:
+        return keep, origin
+    return keep
 
 
 def build_processing_summary(validation: dict, pii_report: dict) -> list:
@@ -1213,6 +1376,16 @@ def delete_file(url_code, file_id):
     if not file_record:
         db.close()
         return jsonify({'error': 'File not found'}), 404
+
+    # 3.5.0: a file an earlier valuation used stays on record (that run's history); it is
+    # only taken out of the next valuation. A file no run has used is deleted as before.
+    used = db.execute("SELECT 1 FROM run_files WHERE file_id = ? LIMIT 1", (file_id,)).fetchone() \
+        if db.execute("SELECT name FROM sqlite_master WHERE name = 'run_files'").fetchone() else None
+    if used:
+        db.execute("INSERT OR REPLACE INTO set_overrides (vendor_id, file_id, action) VALUES (?, ?, 'exclude')", (vendor['id'], file_id))
+        db.commit()
+        db.close()
+        return jsonify({'success': True, 'removed_from_next_valuation': file_record['original_filename']})
 
     # Delete physical file
     file_path = Path(file_record['file_path'])
@@ -1744,7 +1917,7 @@ v3 = register_v3(app, SimpleNamespace(
     vendor_processing_state=vendor_processing_state, get_vendor_upload_dir=get_vendor_upload_dir,
     validate_portfolio_file=validate_portfolio_file, notify_data_received=notify_data_received,
     upload_url=_upload_url, build_working_set=build_working_set, send_dm_notification=send_dm_notification,
-    send_email=send_email, process_batch_with_pavtech=_process_batch_with_pavtech,
+    send_email=send_email, process_batch_with_pavtech=_process_batch_with_pavtech, next_set=next_set,
     add_column_if_missing_public=add_column_if_missing_public,
 ))
 

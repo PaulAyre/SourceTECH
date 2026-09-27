@@ -2,7 +2,7 @@
 import json
 from unittest import mock
 
-from test_v3_clean_upload import ctx, post_clean  # noqa: F401  (fixture + helper)
+from test_v3_clean_upload import ctx, post_clean, wait_for  # noqa: F401  (fixture + helpers)
 
 
 def _login(c):
@@ -77,7 +77,7 @@ def test_vendor_page_renders(ctx):
     st, c, d, calls = ctx
     _login(c)
     html = c.get('/admin/vendors/V3TEST01').get_data(as_text=True)
-    assert 'id="slots"' in html and '/admin/vendors/V3TEST01/live.json' in html and 'insuranceplus_wordmark_white.svg' in html
+    assert 'id="set-card"' in html and 'id="runs"' in html and '/admin/vendors/V3TEST01/run' in html and '/admin/vendors/V3TEST01/live.json' in html and 'insuranceplus_wordmark_white.svg' in html
 
 
 def test_live_box_has_a_row_per_file_that_lands_with_its_name(ctx):
@@ -135,3 +135,57 @@ def test_admin_downloads_the_redacted_file_the_vendor_cannot(ctx):
     with c.session_transaction() as s:
         s.clear()
     assert c.get(f['download']).status_code == 302, 'the vendor side cannot fetch it'
+
+
+def _names(st, vid):
+    db = st.get_db()
+    out = sorted(r['original_filename'] for r in st.next_set(db, vid))
+    db.close()
+    return out
+
+
+def test_next_valuation_is_last_run_plus_new_with_changes_either_side(ctx):
+    st, c, d, calls = ctx
+    _login(c)
+    db = st.get_db(); vid = db.execute("SELECT id FROM vendors WHERE url_code='V3TEST01'").fetchone()[0]
+    db.execute("DELETE FROM submissions"); db.commit(); db.close()
+    # first visit: two files, submitted
+    c.post('/V3TEST01/submit-intent', json={'client_ids': ['cid-000001', 'cid-000002']})
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    post_clean(c, 'tal_1.xlsx', insurer='tal', client_id='cid-000002')
+    assert wait_for(lambda: len(calls['batches']) == 1)
+    first = calls['batches'][0]['files']
+    assert sorted(first) == ['aia_1.xlsx', 'tal_1.xlsx']
+    db = st.get_db(); ref1 = db.execute("SELECT reference FROM submission_intents ORDER BY id DESC").fetchone()[0]
+    db.execute("INSERT INTO submissions (vendor_id, file_count, pavtech_status, reference, submitted_at) VALUES (?, 2, 'complete', ?, datetime('now', '+1 second'))", (vid, ref1))
+    db.commit()
+    assert sorted(r[0] for r in db.execute("SELECT f.original_filename FROM run_files r JOIN vendor_files f ON f.id = r.file_id WHERE r.reference = ?", (ref1,))) == ['aia_1.xlsx', 'tal_1.xlsx']
+    aia_id = db.execute("SELECT id FROM vendor_files WHERE original_filename='aia_1.xlsx'").fetchone()[0]
+    db.close()
+    # the next set starts as the last run
+    assert _names(st, vid) == ['aia_1.xlsx', 'tal_1.xlsx']
+    # the vendor removes the AIA file: it leaves the next valuation but stays on record
+    r = c.delete(f'/V3TEST01/files/{aia_id}')
+    assert r.get_json().get('removed_from_next_valuation')
+    assert _names(st, vid) == ['tal_1.xlsx']
+    db = st.get_db(); assert db.execute("SELECT 1 FROM vendor_files WHERE id = ?", (aia_id,)).fetchone(); db.close()
+    # the DM drags it back in, then runs the valuation again
+    assert c.post('/admin/vendors/V3TEST01/set', json={'file_id': aia_id, 'action': 'include'}).status_code == 200
+    assert _names(st, vid) == ['aia_1.xlsx', 'tal_1.xlsx']
+    r = c.post('/admin/vendors/V3TEST01/run')
+    assert r.status_code == 200 and r.get_json()['files'] == 2
+    assert wait_for(lambda: len(calls['batches']) == 2)
+    assert sorted(calls['batches'][1]['files']) == ['aia_1.xlsx', 'tal_1.xlsx']
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert {f['name'] for f in b['next']['files']} == {'aia_1.xlsx', 'tal_1.xlsx'}
+    assert b['runs'][0]['file_list'] and b['runs'][0]['files_reconstructed'] is False
+
+
+def test_board_shows_origin_of_each_file_in_the_next_valuation(ctx):
+    st, c, d, calls = ctx
+    _login(c)
+    db = st.get_db(); db.execute("DELETE FROM submissions"); db.commit(); db.close()
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert [(f['name'], f['origin']) for f in b['next']['files']] == [('aia_1.xlsx', 'new')]
+    assert b['next']['files'][0]['download'].endswith('/download')

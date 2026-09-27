@@ -7,7 +7,8 @@
     :root { --ip-green: #004223; --ip-green-2: #1e5631; --ip-green-3: #2d7a4a; --ip-mint: #e8f5e9; --ip-line: #a5d6a7; }
     body { background: #f5f8f6; }
     .st-bar { background: linear-gradient(135deg, var(--ip-green) 0%, var(--ip-green-2) 100%); color: #fff; }
-    .st-bar .inner { max-width: 1400px; margin: 0 auto; padding: 0.7rem 1.25rem; display: flex; align-items: center; gap: 1.25rem; }
+    .st-bar .inner { max-width: 1400px; margin: 0 auto; padding: 0.7rem 1.25rem; display: flex; align-items: center; gap: 0.5rem 1.25rem; flex-wrap: wrap; }
+    @media (max-width: 560px) { .st-bar nav { margin-left: 0; } .st-bar .brand img { height: 24px; } }
     .st-bar .brand { display: flex; align-items: center; gap: 0.9rem; color: #fff; text-decoration: none; }
     .st-bar .brand img { height: 30px; }
     .st-bar .brand span { font-size: 1.05rem; font-weight: 300; opacity: 0.9; border-left: 1px solid rgba(255,255,255,0.35); padding-left: 0.9rem; }
