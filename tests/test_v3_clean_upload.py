@@ -35,8 +35,9 @@ def ctx(monkeypatch):
     import app as st
     calls = {'batches': [], 'emails': []}
 
-    def fake_batch(file_paths, vendor_name, deal_id=None, generator_name=None):
-        calls['batches'].append({'files': [Path(p).name for p in file_paths], 'vendor': vendor_name, 'deal_id': deal_id, 'generator': generator_name})
+    def fake_batch(file_paths, vendor_name, deal_id=None, generator_name=None, insurer_by_filename=None):
+        calls['batches'].append({'files': [Path(p).name for p in file_paths], 'vendor': vendor_name, 'deal_id': deal_id,
+                                 'generator': generator_name, 'insurers': dict(insurer_by_filename or {})})
         return False, {'error': 'pytest: PavTECH not called'}
 
     def fake_email(**kw):
@@ -171,6 +172,7 @@ def test_submit_before_uploads_finish_then_runs_when_the_last_file_lands(ctx):
     b = calls['batches'][0]
     assert sorted(b['files']) == ['aia_1.xlsx', 'tal_1.xlsx']
     assert b['deal_id'] == '287657057728' and b['generator'] == 'SourceTECH', 'HubSpot deal id goes to PavTECH'
+    assert b['insurers'] == {'aia_1.xlsx': 'AIA', 'tal_1.xlsx': 'TAL'}, "each file's tile goes to PavTECH as its insurer (3.0.3)"
     c.post('/V3TEST01/submit-finalize')
     time.sleep(0.2)
     assert len(calls['batches']) == 1, 'finalize is idempotent'

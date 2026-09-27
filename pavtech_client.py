@@ -32,7 +32,7 @@ class PavTechClient:
         self.max_poll_time = 600  # 10 minutes max
 
     def process_batch(self, file_paths: List[Path], vendor_name: str, deal_id: str = None,
-                      generator_name: str = None) -> Tuple[bool, Dict]:
+                      generator_name: str = None, insurer_by_filename: Dict[str, str] = None) -> Tuple[bool, Dict]:
         """
         Process multiple files through PavTECH as a batch.
 
@@ -63,10 +63,19 @@ class PavTechClient:
 
             batch_id = upload_result['batch_id']
             file_ids = upload_result['file_ids']
+            # file_id -> the vendor's insurer pick. A workbook PavTECH split into sheets or
+            # insurer parts keeps the pick only when the split did not name an insurer itself.
+            insurer_by_id = {}
+            for info in upload_result.get('files') or []:
+                sheet = info.get('sheet_info') or {}
+                source_name = sheet.get('original_file') or info.get('filename')
+                pick = (insurer_by_filename or {}).get(source_name)
+                if pick and not sheet.get('insurer_row_split'):
+                    insurer_by_id[info.get('file_id')] = pick
             logger.info(f"Uploaded batch to PavTECH: {batch_id} with {len(file_ids)} files")
 
             # Step 2: Start processing all files (one by one)
-            process_result = self._start_processing(vendor_name, batch_id, file_ids)
+            process_result = self._start_processing(vendor_name, batch_id, file_ids, insurer_by_id)
             if not process_result.get('success'):
                 logger.warning(f"Process start returned: {process_result}")
                 # Continue anyway - some files may have started
@@ -152,7 +161,8 @@ class PavTechClient:
                     return {
                         'success': True,
                         'batch_id': result['batch_id'],
-                        'file_ids': result.get('file_ids', [])
+                        'file_ids': result.get('file_ids', []),
+                        'files': result.get('files', []),
                     }
                 else:
                     logger.error(f"Upload response missing batch_id: {result}")
@@ -176,11 +186,13 @@ class PavTechClient:
             logger.error(f"Upload request error: {e}")
             return {'success': False, 'error': str(e)}
 
-    def _start_processing(self, vendor_name: str, batch_id: str, file_ids: List[str]) -> Dict:
+    def _start_processing(self, vendor_name: str, batch_id: str, file_ids: List[str],
+                          insurer_by_id: Dict[str, str] = None) -> Dict:
         """Start processing all files in batch via /api/batch/process_file for each file."""
         results = {'success': True, 'started': [], 'failed': []}
 
         for file_id in file_ids:
+            pick = (insurer_by_id or {}).get(file_id, '')
             try:
                 response = requests.post(
                     f"{self.base_url}/api/batch/process_file",
@@ -188,7 +200,8 @@ class PavTechClient:
                         'vendor_name': vendor_name,
                         'batch_id': batch_id,
                         'file_id': file_id,
-                        'company_name': ''  # Let PavTECH auto-detect from filename
+                        'company_name': pick,  # the vendor's tile; blank = PavTECH decides
+                        'insurer_confirmed': bool(pick),
                     },
                     timeout=30
                 )

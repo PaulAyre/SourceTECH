@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.0.2'  # 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.0.3'  # 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -214,6 +214,12 @@ INSURERS = [
 
 INSURER_KEYS = {ins["key"] for ins in INSURERS}
 INSURER_NAME_BY_KEY = {ins["key"]: ins["name"] for ins in INSURERS}
+# 3.0.3: the tile key as PavTECH names the insurer (its dropdown / insurer_identity
+# labels). BT Life books are TAL-issued now but the vendor picked BT, so say BT Life.
+PAVTECH_INSURER_BY_KEY = {
+    "aia": "AIA", "tal": "TAL", "zurich": "Zurich", "mlc": "MLC", "metlife": "MetLife",
+    "clearview": "ClearView", "resolution": "Resolution Life", "bt": "BT Life", "neos": "NEOS",
+}
 
 # Special catch-all tag for files that do not map to any named insurer. Uploaded
 # via the always-available "Other / unassigned" slot; a valid tag value so
@@ -1195,10 +1201,19 @@ def _process_batch_with_pavtech(vendor: dict, file_paths: list, files_info: list
         # Process through PavTECH
         # Pass the HubSpot deal id so PavTECH ties the run to the exact deal (its HubSpot
         # attach and owner lookup) instead of fuzzy-matching the vendor name.
+        # 3.0.3: each file goes with the insurer the vendor picked for it (the tile they
+        # uploaded under), sent as a confirmed pick. PavTECH labels the file with it and
+        # checks it against the column layout. 'Other' files carry no pick.
+        insurer_by_name = {}
+        for f in files_info:
+            name = PAVTECH_INSURER_BY_KEY.get(f.get('insurer') or '')
+            if name and f.get('file_path'):
+                insurer_by_name[Path(f['file_path']).name] = name
         success, result = pavtech.process_batch(
             file_paths, vendor['vendor_name'],
             deal_id=(vendor.get('hubspot_deal_id') or None),
             generator_name='SourceTECH',
+            insurer_by_filename=insurer_by_name,
         )
 
         # Build file summary for email
