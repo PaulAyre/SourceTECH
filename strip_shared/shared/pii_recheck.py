@@ -15,7 +15,7 @@ import os
 import re
 import unicodedata
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 import ref_tokens as rt
 
@@ -161,22 +161,29 @@ def recheck_and_rehash(path, app_key, secret, rules=None, names=None, save_to=No
     findings, rehashed, rows_total = [], 0, 0
     drop_tokens = not secret or len(secret) < 32
 
-    wb = load_workbook(path)          # not read_only: we may blank cells
-    for ws in wb.worksheets:
-        if ws.sheet_state != "visible":
+    # Streamed (SourceTECH 3.3.1, 27 Sep 2026): a 15,600-row book loaded in openpyxl's full
+    # mode killed the 512MB server. Plain values are read once, checked and blanked exactly
+    # as before, then written back row by row. The browser rebuilt this file as plain data,
+    # so no formatting is lost.
+    wb = load_workbook(path, read_only=True, data_only=True)
+    out_sheets = []
+    for n, ws in enumerate(wb.worksheets):
+        if getattr(ws, "sheet_state", "visible") != "visible":
             findings.append({"sheet": ws.title, "kind": "hidden_sheet", "reason": "hidden_sheet_survived", "count": 1})
-            wb.remove(ws)
             continue
-        if name_hit(ws.title) or _EMAIL.search(ws.title):
+        title = ws.title
+        if name_hit(title) or _EMAIL.search(title):
             findings.append({"sheet": "(renamed)", "kind": "sheet_name", "reason": "name", "count": 1})
-            ws.title = "Sheet%d" % (wb.worksheets.index(ws) + 1)
-        grid = list(ws.iter_rows())
+            title = "Sheet%d" % (n + 1)
+        grid = [list(r) for r in ws.iter_rows(values_only=True)]
+        while grid and not any(v not in (None, "") for v in grid[-1]):
+            grid.pop()   # read-only mode can report trailing empty rows
         if not grid:
             continue
         # header = the row holding ref_first, else the row with the most recognised headers
         h, best = -1, 0
         for r, row in enumerate(grid[: rules["valueScan"]["maxHeaderSearchRows"]]):
-            texts = [_text(c.value) for c in row]
+            texts = [_text(v) for v in row]
             if "ref_first" in texts:
                 h = r
                 break
@@ -184,57 +191,60 @@ def recheck_and_rehash(path, app_key, secret, rules=None, names=None, save_to=No
             if known > best and known >= 2:
                 h, best = r, known
         if h < 0:
-            findings.append({"sheet": ws.title, "kind": "sheet", "reason": "no_table_found", "count": 1})
-            wb.remove(ws)
+            findings.append({"sheet": title, "kind": "sheet", "reason": "no_table_found", "count": 1})
             continue
+        head = grid[h]
+        body = range(h + 1, len(grid))
         # rows that actually carry data (blank spacer rows do not count)
-        token_idx = {i for i, c in enumerate(grid[h]) if _text(c.value) in token_cols}
+        token_idx = {i for i, v in enumerate(head) if _text(v) in token_cols}
         # a real row has a policy number, when the file has that column (totals and spacers do not count)
-        id_idx = next((i for i, c in enumerate(grid[h]) if classify_header(_text(c.value), rules) == ("protected", "id")), None)
-        if id_idx is not None and any(_text(row[id_idx].value) for row in grid[h + 1:] if id_idx < len(row)):
-            rows_total += sum(1 for row in grid[h + 1:] if id_idx < len(row) and _text(row[id_idx].value) and not _TOTALS.match(_text(row[id_idx].value)))
+        id_idx = next((i for i, v in enumerate(head) if classify_header(_text(v), rules) == ("protected", "id")), None)
+        if id_idx is not None and any(_text(grid[r][id_idx]) for r in body if id_idx < len(grid[r])):
+            rows_total += sum(1 for r in body if id_idx < len(grid[r]) and _text(grid[r][id_idx]) and not _TOTALS.match(_text(grid[r][id_idx])))
         else:
-            rows_total += sum(1 for row in grid[h + 1:] if any(_text(c.value) for i, c in enumerate(row) if i not in token_idx))
+            rows_total += sum(1 for r in body if any(_text(v) for i, v in enumerate(grid[r]) if i not in token_idx))
 
         # rows above the header
-        for row in grid[:h]:
-            for c in row:
-                t = _text(c.value)
+        for r in range(h):
+            for ci, v in enumerate(grid[r]):
+                t = _text(v)
                 if t and (_EMAIL.search(t) or _PHONE.search(t) or addr_hit(t) or name_hit(t)):
-                    c.value = None
-                    findings.append({"sheet": ws.title, "kind": "pre_header_cell", "reason": "personal_detail", "count": 1})
+                    grid[r][ci] = None
+                    findings.append({"sheet": title, "kind": "pre_header_cell", "reason": "personal_detail", "count": 1})
 
-        for ci, hc in enumerate(grid[h]):
-            header = _text(hc.value)
-            cells = [row[ci] for row in grid[h + 1:] if ci < len(row)]
+        def blank_column(ci):
+            head[ci] = None
+            for r in body:
+                if ci < len(grid[r]):
+                    grid[r][ci] = None
+
+        for ci in range(len(head)):
+            header = _text(head[ci])
+            rows_here = [r for r in body if ci < len(grid[r])]
             if header in token_cols:
                 if drop_tokens:
-                    hc.value = None
-                    for c in cells:
-                        c.value = None
+                    blank_column(ci)
                     continue
                 if header in hash_cols:
-                    for c in cells:
-                        v = _text(c.value)
+                    for r in rows_here:
+                        v = _text(grid[r][ci])
                         if not v:
                             continue
                         try:
-                            c.value = ";".join(rt.server_hash(secret, p) for p in v.split(";"))
+                            grid[r][ci] = ";".join(rt.server_hash(secret, p) for p in v.split(";"))
                             rehashed += 1
                         except ValueError:
-                            c.value = None     # not a token: something put real text in a token column
-                            findings.append({"sheet": ws.title, "kind": "token_cell", "reason": "not_a_token", "count": 1})
+                            grid[r][ci] = None     # not a token: something put real text in a token column
+                            findings.append({"sheet": title, "kind": "token_cell", "reason": "not_a_token", "count": 1})
                 continue
 
             cls, kind = classify_header(header, rules)
-            texts = [_text(c.value) for c in cells]
+            texts = [_text(grid[r][ci]) for r in rows_here]
             if header and cls != "protected" and (_EMAIL.search(header) or _PHONE.search(header) or name_hit(header)):
                 cls, kind = "pii", "header_is_pii"
             if cls == "pii":
-                hc.value = None
-                for c in cells:
-                    c.value = None
-                findings.append({"sheet": ws.title, "kind": "column", "reason": kind, "count": sum(1 for t in texts if t)})
+                blank_column(ci)
+                findings.append({"sheet": title, "kind": "column", "reason": kind, "count": sum(1 for t in texts if t)})
                 continue
             if cls == "protected" and kind in lenient:
                 bad = [i for i, t in enumerate(texts) if t and _EMAIL.search(t)]
@@ -242,10 +252,8 @@ def recheck_and_rehash(path, app_key, secret, rules=None, names=None, save_to=No
                 bad = [i for i, t in enumerate(texts) if t and (_EMAIL.search(t) or _PHONE.search(t) or addr_hit(t))]
             name_hits = [] if (cls == "protected" and kind == "adviser") else [i for i, t in enumerate(texts) if t and name_hit(t)]
             if cls == "unknown" and (bad or name_hits):
-                hc.value = None
-                for c in cells:
-                    c.value = None
-                findings.append({"sheet": ws.title, "kind": "column", "reason": "value_scan", "count": len(bad) + len(name_hits)})
+                blank_column(ci)
+                findings.append({"sheet": title, "kind": "column", "reason": "value_scan", "count": len(bad) + len(name_hits)})
                 continue
             if cls == "protected" and kind not in lenient and kind != "adviser":
                 filled = sum(1 for t in texts if t)
@@ -253,17 +261,23 @@ def recheck_and_rehash(path, app_key, secret, rules=None, names=None, save_to=No
                 if len(name_hits) >= p["minNameHitsToFlag"] and filled and len(name_hits) / filled >= p["nameRateToFlag"]:
                     bad = sorted(set(bad + name_hits))
             for i in bad:
-                cells[i].value = None
+                grid[rows_here[i]][ci] = None
             if bad:
-                findings.append({"sheet": ws.title, "kind": "cells", "reason": "personal_detail_in_needed_column", "count": len(bad)})
+                findings.append({"sheet": title, "kind": "cells", "reason": "personal_detail_in_needed_column", "count": len(bad)})
+        out_sheets.append((title, grid))
+    wb.close()
 
-    if not wb.worksheets:
+    if not out_sheets:
         raise ValueError("no_table_found")
-    wb.properties.creator = ""
-    wb.properties.lastModifiedBy = ""
-    wb.properties.title = ""
-    wb.properties.company = "" if hasattr(wb.properties, "company") else None
-    wb.save(save_to or path)
+    out = Workbook(write_only=True)
+    for title, grid in out_sheets:
+        ws = out.create_sheet(title)
+        for row in grid:
+            ws.append(row)
+    out.properties.creator = ""
+    out.properties.lastModifiedBy = ""
+    out.properties.title = ""
+    out.save(save_to or path)
     if drop_tokens:
         findings.append({"sheet": "*", "kind": "config", "reason": "REF_TOKEN_SECRET_missing_token_columns_dropped", "count": 1})
     return {"findings": findings, "tokens_rehashed": rehashed, "token_columns_dropped": drop_tokens, "rows": rows_total}

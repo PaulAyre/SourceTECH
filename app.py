@@ -2,7 +2,7 @@
 SourceTECH - Vendor Portfolio Upload Portal
 Main Flask application
 """
-from flask import Flask, request, render_template, redirect, url_for, jsonify, session, send_from_directory
+from flask import Flask, request, render_template, redirect, url_for, jsonify, session, send_from_directory, send_file
 from functools import wraps
 from werkzeug.utils import secure_filename
 from validator import validate_portfolio_file
@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.3.0'  # 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.4.0'  # 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -574,8 +574,9 @@ def vendor_board(db, vendor):
             notes = [NOTE_TEXT.get(n.get('code'), str(n.get('code', '')).replace('_', ' ')) for n in json.loads(f.get('note_codes') or '[]')]
         except (ValueError, TypeError, AttributeError):
             notes = []
-        by_ins.setdefault(key, []).append({'name': f.get('original_filename') or f.get('filename'), 'policies': f.get('policy_count') or 0,
-                                           'uploaded_at': f.get('uploaded_at'), 'notes': [n for n in notes if n]})
+        by_ins.setdefault(key, []).append({'id': f.get('id'), 'name': f.get('original_filename') or f.get('filename'), 'policies': f.get('policy_count') or 0,
+                                           'uploaded_at': f.get('uploaded_at'), 'notes': [n for n in notes if n],
+                                           'download': url_for('admin_download_file', url_code=v['url_code'], file_id=f.get('id'))})
     inflight = {}
     if live:
         for it in pl.get('items') or []:
@@ -598,6 +599,7 @@ def vendor_board(db, vendor):
             'key': k, 'name': cat['name'] if cat else 'Other / unassigned', 'badge': cat['badge'] if cat else '?',
             'color': cat['color'] if cat else '#6b7280', 'logo': (url_for('static', filename=f'images/insurers/{k}.png') if k in INSURER_LOGOS else None),
             'expected': k in expected, 'state': state, 'files': by_ins.get(k, []),
+            'inflight': [{'state': i['state'], 'fraction': i.get('fraction') or 0} for i in fl],   # 3.4.0: a bar per file
             'policies': sum(x['policies'] for x in by_ins.get(k, [])),
             'progress': round(sum(prog) / len(prog), 2) if prog else None, 'in_flight': len(fl),
         })
@@ -630,9 +632,16 @@ def vendor_board(db, vendor):
                              'name': row['original_filename'] if row else None, 'policies': (row['policy_count'] or 0) if row else None})
         order = {'uploading': 0, 'stripping': 1, 'failed': 2, 'interrupted': 3, 'received': 4}
         activity.sort(key=lambda a: order.get(a['state'], 5))
+    # 3.4.0: the Inbox tile lists every insurer the vendor has not chosen yet; each one is
+    # knocked off (into its own slot) the moment they tick it or a file for it arrives.
+    chosen = set(keys)
+    inbox = [{'key': i['key'], 'name': i['name'], 'badge': i['badge'], 'color': i['color'],
+              'logo': url_for('static', filename=f"images/insurers/{i['key']}.png") if i['key'] in INSURER_LOGOS else None}
+             for i in INSURERS if i['key'] not in chosen]
     deal = v.get('hubspot_deal_id')
     return {
         'activity': activity,
+        'inbox': inbox,
         'vendor': {'name': v.get('deal_name') or v['vendor_name'], 'code': v['url_code'], 'status': v.get('status'), 'dm': v.get('dm_name'),
                    'deal_url': (HUBSPOT_DEAL_URL + str(deal)) if deal else None, 'created_at': v.get('created_at')},
         'presence': {'state': pres['state'], 'age_s': pres['age_s'], 'step': pl.get('step') if live else None},
@@ -641,6 +650,20 @@ def vendor_board(db, vendor):
                    'expected': len(expected), 'expected_received': sum(1 for s_ in slots if s_['expected'] and s_['files'])},
         'server_time': datetime.utcnow().isoformat() + 'Z',
     }
+
+
+@app.route('/admin/vendors/<url_code>/files/<int:file_id>/download')
+@admin_required
+def admin_download_file(url_code, file_id):
+    """3.4.0: the redacted file exactly as SourceTECH kept it, so the admin can check that the
+    personal details are gone. Admin only; the vendor never has this route."""
+    db = get_db()
+    row = db.execute('''SELECT f.file_path, f.original_filename FROM vendor_files f JOIN vendors v ON v.id = f.vendor_id
+                        WHERE v.url_code = ? AND f.id = ?''', (url_code, file_id)).fetchone()
+    db.close()
+    if not row or not row['file_path'] or not Path(row['file_path']).exists():
+        return jsonify({'error': 'file not found'}), 404
+    return send_file(row['file_path'], as_attachment=True, download_name=f"REDACTED {row['original_filename']}")
 
 
 @app.route('/admin/vendors/<url_code>/live.json')

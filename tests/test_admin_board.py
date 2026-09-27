@@ -109,3 +109,29 @@ def test_display_name_follows_hubspot(ctx):
     db = st.get_db()
     assert db.execute("SELECT vendor_name FROM vendors WHERE url_code='V3TEST01'").fetchone()[0] == 'Pytest Wealth', 'the name PavTECH files runs under never changes'
     db.close()
+
+
+def test_inbox_lists_insurers_until_the_vendor_chooses_them(ctx):
+    st, c, d, calls = ctx
+    _login(c)
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    everyone = {i['key'] for i in b['inbox']}
+    assert {'aia', 'tal', 'zurich'} <= everyone and not b['slots']
+    c.post('/V3TEST01/presence', json={'step': 0, 'selected': ['tal'], 'items': []})
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert 'tal' not in {i['key'] for i in b['inbox']}, 'ticked insurers are knocked off the inbox'
+    tal = [s for s in b['slots'] if s['key'] == 'tal'][0]
+    assert tal['state'] == 'ticked' and tal['files'] == [] and tal['inflight'] == []
+
+
+def test_admin_downloads_the_redacted_file_the_vendor_cannot(ctx):
+    st, c, d, calls = ctx
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    assert c.get('/admin/vendors/V3TEST01/live.json').status_code in (302, 401), 'no admin session, no board'
+    _login(c)
+    f = c.get('/admin/vendors/V3TEST01/live.json').get_json()['slots'][0]['files'][0]
+    r = c.get(f['download'])
+    assert r.status_code == 200 and r.data[:2] == b'PK' and 'REDACTED' in r.headers['Content-Disposition']
+    with c.session_transaction() as s:
+        s.clear()
+    assert c.get(f['download']).status_code == 302, 'the vendor side cannot fetch it'
