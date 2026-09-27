@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.0.3'  # 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.0.4'  # 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -658,12 +658,56 @@ def get_vendor_files(vendor_id: int) -> list:
     return [dict(f) for f in files]
 
 
-def build_working_set(db, vendor_id: int) -> tuple:
+def content_fingerprint(path) -> str:
+    """sha256 of a workbook's cell values, sheet by sheet (3.0.4).
+
+    The browser rebuilds every upload as a new .xlsx, so the same export uploaded
+    twice has different bytes (the file carries its creation time) but identical
+    cells. Hashing the values catches that; formatting and metadata are ignored."""
+    import hashlib
+    from openpyxl import load_workbook
+    h = hashlib.sha256()
+    wb = load_workbook(str(path), read_only=True, data_only=True)
+    try:
+        for ws in wb.worksheets:
+            h.update(b'\x00sheet\x00')
+            for row in ws.iter_rows(values_only=True):
+                h.update(repr(tuple(v for v in row)).encode('utf-8'))
+    finally:
+        wb.close()
+    return h.hexdigest()
+
+
+def _content_sha(db, f):
+    """The row's cached fingerprint, computed and stored on first use. None if unreadable."""
+    try:
+        cached = f['content_sha']
+    except (IndexError, KeyError):
+        cached = None
+    if cached:
+        return cached
+    try:
+        sha = content_fingerprint(f['file_path'])
+    except Exception as exc:
+        logger.error("content fingerprint failed for vendor_files.id=%s (%s): %s", f['id'], f['file_path'], exc)
+        return None
+    try:
+        db.execute("UPDATE vendor_files SET content_sha = ? WHERE id = ?", (sha, f['id']))
+        db.commit()
+    except sqlite3.Error as exc:
+        logger.warning("could not cache content_sha for vendor_files.id=%s: %s", f['id'], exc)
+    return sha
+
+
+def build_working_set(db, vendor_id: int, duplicates: list = None) -> tuple:
     """The deduped file set a Submit would send to PavTECH.
 
     All uploads newest first, keeping only the latest upload of each ORIGINAL
     filename (re-uploading an edited file with the same name replaces the older
-    one). Shared by the Review endpoint and the Submit action so the review
+    one). 3.0.4: a file whose cells are identical to a newer kept file is dropped
+    too, so the same export under two names is not valued twice; each drop is
+    appended to ``duplicates`` ({'file', 'same_as'}) when a list is passed.
+    Shared by the Review endpoint and the Submit action so the review
     shows exactly what will be processed. Returns (working_rows, total_uploads).
     """
     all_files = db.execute('''
@@ -673,12 +717,22 @@ def build_working_set(db, vendor_id: int) -> tuple:
     ''', (vendor_id,)).fetchall()
 
     seen_names = set()
+    seen_content = {}
     working = []
     for f in all_files:
         name = f['original_filename']
         if name in seen_names:
             continue  # older version of a same-named file; skip
         seen_names.add(name)
+        sha = _content_sha(db, f) if f['file_path'] and Path(f['file_path']).exists() else None
+        if sha and sha in seen_content:
+            if duplicates is not None:
+                duplicates.append({'file': name, 'same_as': seen_content[sha]})
+            logger.warning("working set: %s has the same cells as %s; left out (vendor_id=%s)",
+                           name, seen_content[sha], vendor_id)
+            continue
+        if sha:
+            seen_content[sha] = name
         working.append(f)
     return working, len(all_files)
 

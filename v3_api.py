@@ -68,6 +68,7 @@ def register_v3(app, d):
         d.add_column_if_missing_public(db, 'vendor_files', 'client_id', 'TEXT')
         d.add_column_if_missing_public(db, 'vendor_files', 'note_codes', 'TEXT')
         d.add_column_if_missing_public(db, 'vendor_files', 'strip_report', 'TEXT')
+        d.add_column_if_missing_public(db, 'vendor_files', 'content_sha', 'TEXT')  # 3.0.4: cell-value fingerprint
         db.execute('''
             CREATE TABLE IF NOT EXISTS submission_intents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -276,9 +277,12 @@ def register_v3(app, d):
     def start_processing(vendor_id: int, reference: str, missing: int = 0, expected: int = 0):
         db = d.get_db()
         vendor = db.execute("SELECT * FROM vendors WHERE id = ?", (vendor_id,)).fetchone()
-        files, _total = d.build_working_set(db, vendor_id)
+        duplicates = []
+        files, _total = d.build_working_set(db, vendor_id, duplicates=duplicates)
         file_paths = [Path(f['file_path']) for f in files if Path(f['file_path']).exists()]
         extra = []
+        for dup in duplicates:   # 3.0.4: same data counted once, and the DM is told
+            extra.append(f"{dup['file']} holds the same policies as {dup['same_as']}; it was left out so the book is not counted twice.")
         if missing:
             extra.append(f"{missing} of {expected} files the vendor added never finished uploading (their browser was closed or lost connection). "
                          f"This run used the {len(file_paths)} that arrived. The vendor's link invites them to add the rest, which re-runs it.")

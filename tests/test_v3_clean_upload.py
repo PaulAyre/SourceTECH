@@ -191,3 +191,26 @@ def test_tab_closed_after_submit_runs_with_what_arrived_and_tells_the_dm(ctx):
     st.v3['sweep_overdue']()
     time.sleep(0.2)
     assert len(calls['batches']) == 1, 'a second sweep (or another gunicorn worker) cannot run it twice'
+
+
+def test_same_data_under_two_names_is_valued_once_and_the_dm_is_told(ctx, tmp_path):
+    """3.0.4: the browser rebuilds every file, so a re-uploaded export has new bytes but the
+    same cells. It must not be valued twice (the test deal's $299K was one TAL file x9)."""
+    st, c, d, calls = ctx
+    wb = load_workbook(FIX / 'tal_1.xlsx')
+    wb.properties.creator = 'a different export run'
+    buf = io.BytesIO(); wb.save(buf)
+    again = buf.getvalue()
+    assert again != (FIX / 'tal_1.xlsx').read_bytes(), 'different bytes, same cells'
+    c.post('/V3TEST01/submit-intent', json={'client_ids': ['cid-000001', 'cid-000002', 'cid-000003']})
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    post_clean(c, 'tal_1.xlsx', insurer='tal', client_id='cid-000002')
+    r = c.post('/V3TEST01/clean-upload', content_type='multipart/form-data', data={
+        'file': (io.BytesIO(again), 'tal_again.xlsx'), 'insurer': 'tal', 'client_id': 'cid-000003',
+        'safe_report': json.dumps({'rulesVersion': '0.1.0', 'notes': []})})
+    assert r.status_code == 200 and not r.get_json()['duplicate'], 'bytes differ, so the upload itself is accepted'
+    assert wait_for(lambda: len(calls['batches']) == 1)
+    assert len(calls['batches'][0]['files']) == 2, calls['batches'][0]['files']
+    assert wait_for(lambda: len(calls['emails']) == 1)
+    notes = ' '.join(calls['emails'][0].get('extra_notes') or [])
+    assert 'same policies' in notes and 'not counted twice' in notes
