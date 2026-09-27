@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 
-{% block title %}{{ vendor.vendor_name }} - SourceTECH{% endblock %}
+{% block title %}{{ vendor.deal_name or vendor.vendor_name }} - SourceTECH{% endblock %}
 
 {% block admin_head %}
 <style>
@@ -38,6 +38,21 @@
     .s-file .p { color: #1e5631; font-weight: 600; white-space: nowrap; }
     .s-note { display: inline-block; font-size: 0.68rem; background: #fff4e0; color: #8a5300; border-radius: 4px; padding: 0.05rem 0.35rem; margin: 0.1rem 0.2rem 0 0; }
     .s-empty { color: #8a9a91; font-size: 0.78rem; }
+    .l-row { display: grid; grid-template-columns: 26px minmax(0, 1.4fr) minmax(0, 2fr) 150px; gap: 0.7rem; align-items: center; padding: 0.55rem 0.8rem; border-bottom: 1px solid #eef2ef; font-size: 0.85rem; transition: background 0.6s; }
+    .l-row:last-child { border-bottom: none; }
+    .l-row .who { min-width: 0; }
+    .l-row .who b { color: var(--c); }
+    .l-row .who div { font-size: 0.74rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .l-bar { height: 10px; background: #eef2ef; border-radius: 999px; overflow: hidden; }
+    .l-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #22c55e, #1e5631); transition: width 0.8s; }
+    .l-row.received .l-bar > span { background: #1e5631; }
+    .l-row.failed .l-bar > span, .l-row.interrupted .l-bar > span { background: #dc3545; }
+    .l-state { font-size: 0.78rem; font-weight: 600; text-align: right; }
+    .l-row.received .l-state { color: #1e5631; }
+    .l-row.stripping .l-state, .l-row.uploading .l-state { color: #0f7a3a; }
+    .l-row.failed .l-state, .l-row.interrupted .l-state { color: #b00020; }
+    .l-row.just-landed { background: #eafbf0; }
+    .l-empty { padding: 0.9rem; color: #8a9a91; font-size: 0.82rem; }
     .runs { margin-top: 1rem; }
     .run { display: flex; align-items: center; gap: 0.8rem; padding: 0.5rem 0.8rem; border-bottom: 1px solid #eef2ef; font-size: 0.84rem; }
     .run:last-child { border-bottom: none; }
@@ -51,7 +66,7 @@
 
 {% block content %}
 <div class="b-top">
-    <h1 class="b-title" id="b-title">{{ vendor.vendor_name }}</h1>
+    <h1 class="b-title" id="b-title">{{ vendor.deal_name or vendor.vendor_name }}</h1>
     <span class="pill" id="b-presence"><span class="dot"></span> Connecting</span>
     <div class="b-actions">
         <div class="b-link"><code>{{ upload_url }}</code>
@@ -62,6 +77,12 @@
     </div>
 </div>
 <div class="b-summary" id="b-summary"></div>
+
+<!-- 3.3.0: every file of the vendor's current visit, with its own progress and landing -->
+<div class="pv-card" id="live-box" style="margin-bottom: 0.9rem;">
+    <div class="pv-head"><span><i class="bi bi-broadcast me-2"></i>Live uploads</span><span class="sub" id="live-sub">waiting for the vendor</span></div>
+    <div id="live-rows"><div class="l-empty">Nothing uploading. When the vendor adds files, each one appears here with its own progress, then lands.</div></div>
+</div>
 
 <div class="pv-card" style="border: none; background: transparent; box-shadow: none;">
     <div class="slots" id="slots"></div>
@@ -143,12 +164,38 @@ function render(b) {
     document.getElementById('b-updated').textContent = 'live, updated ' + new Date().toLocaleTimeString('en-GB');
 }
 
+// 3.3.0: the live-uploads box. A row per file of this visit: its own bar through
+// preparing and uploading, then 'Landed' with the stored name and policy count.
+const landedAt = {};
+function renderLive(b) {
+    const rows = b.activity || [];
+    const busy = rows.filter(a => a.state === 'stripping' || a.state === 'uploading').length;
+    document.getElementById('live-sub').textContent = busy ? `${busy} in progress` : rows.length ? `${rows.filter(a => a.state === 'received').length} landed this visit` : 'waiting for the vendor';
+    if (!rows.length) return;
+    const now = Date.now();
+    let n = 0;
+    document.getElementById('live-rows').innerHTML = rows.map(a => {
+        n += 1;
+        if (a.state === 'received' && !landedAt[a.id]) landedAt[a.id] = now;
+        const fresh = landedAt[a.id] && now - landedAt[a.id] < 8000;
+        const pct = a.state === 'received' ? 100 : Math.round((a.fraction || 0) * 100);
+        const logo = a.logo ? `<img class="ins-logo" src="${a.logo}" alt="">` : `<span class="ins-badge" style="background:${a.color}">${esc(a.badge)}</span>`;
+        const state = { stripping: `Removing personal details ${pct}%`, uploading: pct >= 99 ? 'Arriving' : `Uploading ${pct}%`,
+                        received: a.policies != null ? `Landed &middot; ${fmt(a.policies)} policies` : 'Landed', failed: 'Could not be read', interrupted: 'Vendor left before it finished' }[a.state] || a.state;
+        const title = a.name ? esc(a.name) : `${esc(a.insurer_name)} file`;
+        return `<div class="l-row ${a.state}${fresh ? ' just-landed' : ''}" style="--c:${a.color}">
+            ${logo}<div class="who"><b>${esc(a.insurer_name)}</b><div title="${title}">${a.name ? title : 'name stays on the vendor\u2019s computer until it lands'}</div></div>
+            <div class="l-bar"><span style="width:${pct}%"></span></div><div class="l-state">${state}</div></div>`;
+    }).join('');
+}
+
 async function tick() {
     try {
         const res = await fetch(LIVE, { cache: 'no-store' });
         if (!res.ok) throw new Error(res.status);
         const b = await res.json();
         render(b);
+        renderLive(b);
         const runs = b.runs || [];
         if (runs.length) document.getElementById('runs').innerHTML = runs.map(x => `
             <div class="run"><span class="when">${esc(when(x.submitted_at))}</span>
@@ -160,6 +207,6 @@ async function tick() {
     }
 }
 tick();
-setInterval(tick, 3000);
+setInterval(tick, 2000);   // 3.3.0: faster while watching
 </script>
 {% endblock %}

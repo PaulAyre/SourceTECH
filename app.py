@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.2.0'  # 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.3.0'  # 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -339,6 +339,9 @@ def init_db():
     # selected_insurers: JSON array of insurer keys the admin/DealTECH pre-ticked
     # for this vendor. Pre-checks the adviser's page; adviser can still change it.
     add_column_if_missing("vendors", "selected_insurers", "selected_insurers TEXT")
+    # 3.3.0: the HubSpot deal's CURRENT name, refreshed from the recent-deals list. vendor_name
+    # stays as it was (PavTECH files runs under it, so renaming it would break run links).
+    add_column_if_missing("vendors", "deal_name", "deal_name TEXT")
     # insurer: which insurer catalogue key an uploaded file belongs to (or NULL
     # for a plain/untagged upload). Insurer-specific downstream PavTECH parsing.
     add_column_if_missing("vendor_files", "insurer", "insurer TEXT")
@@ -420,6 +423,10 @@ def admin_vendors():
         for d in res['deals']:
             m = _re.search(r"/([A-Za-z0-9_-]{6,})/?$", d.get('sourcetech_url') or '')
             v = by_deal.get(str(d['deal_id'])) or (by_code.get(m.group(1)) if m else None)
+            if v and d.get('name') and (v['deal_name'] if 'deal_name' in v.keys() else None) != d['name']:
+                db.execute("UPDATE vendors SET deal_name = ? WHERE id = ?", (d['name'], v['id']))   # 3.3.0: follow HubSpot renames
+                db.commit()
+                v = db.execute("SELECT * FROM vendors WHERE id = ?", (v['id'],)).fetchone()
             rows.append({'deal': d, 'board': vendor_board(db, v) if v else None})
     else:
         for v in sorted(vendors, key=lambda x: x['last_submission_at'] or x['created_at'] or '', reverse=True)[:40]:
@@ -544,7 +551,8 @@ def _presence(db, vendor_id):
     except (ValueError, TypeError):
         return {'state': 'never', 'age_s': None, 'payload': {}}
     here = age < 25 and not payload.get('left')
-    return {'state': 'here' if here else 'away', 'age_s': int(age), 'seen_at': row['updated_at'], 'payload': payload}
+    return {'state': 'here' if here else 'away', 'age_s': int(age), 'seen_at': row['updated_at'], 'payload': payload,
+            'recent': age < 600}   # 3.3.0: the live-uploads box keeps the last session's files for 10 minutes
 
 
 def vendor_board(db, vendor):
@@ -601,9 +609,31 @@ def vendor_board(db, vendor):
                      'errors': sub.get('validation_errors'),
                      'url': pavtech_run_url(v['vendor_name'], sub['pavtech_batch_id']) if sub.get('pavtech_batch_id') else None})
     latest = runs[0] if runs else None
+    # 3.3.0: one row per file in the vendor's current session, from their page's reports,
+    # joined to what landed (by the upload's client id) for the stored name and policy count.
+    activity = []
+    if pres.get('recent'):
+        landed = {}
+        for f in db.execute("SELECT client_id, original_filename, policy_count, insurer FROM vendor_files WHERE vendor_id = ?", (v['id'],)).fetchall():
+            if f['client_id']:
+                landed[f['client_id']] = f
+        for it in pl.get('items') or []:
+            row = landed.get(it.get('id'))
+            state = it.get('state')
+            if not live and state in ('stripping', 'uploading'):
+                state = 'interrupted'   # the vendor left before this one finished
+            cat = next((i for i in INSURERS if i['key'] == it.get('insurer')), None)
+            activity.append({'id': it.get('id'), 'insurer': it.get('insurer'), 'insurer_name': cat['name'] if cat else 'Other / unassigned',
+                             'badge': cat['badge'] if cat else '?', 'color': cat['color'] if cat else '#6b7280',
+                             'logo': url_for('static', filename=f"images/insurers/{it.get('insurer')}.png") if it.get('insurer') in INSURER_LOGOS else None,
+                             'state': 'received' if row else state, 'fraction': it.get('fraction'),
+                             'name': row['original_filename'] if row else None, 'policies': (row['policy_count'] or 0) if row else None})
+        order = {'uploading': 0, 'stripping': 1, 'failed': 2, 'interrupted': 3, 'received': 4}
+        activity.sort(key=lambda a: order.get(a['state'], 5))
     deal = v.get('hubspot_deal_id')
     return {
-        'vendor': {'name': v['vendor_name'], 'code': v['url_code'], 'status': v.get('status'), 'dm': v.get('dm_name'),
+        'activity': activity,
+        'vendor': {'name': v.get('deal_name') or v['vendor_name'], 'code': v['url_code'], 'status': v.get('status'), 'dm': v.get('dm_name'),
                    'deal_url': (HUBSPOT_DEAL_URL + str(deal)) if deal else None, 'created_at': v.get('created_at')},
         'presence': {'state': pres['state'], 'age_s': pres['age_s'], 'step': pl.get('step') if live else None},
         'slots': slots, 'latest_run': latest, 'runs': runs,

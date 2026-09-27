@@ -78,3 +78,34 @@ def test_vendor_page_renders(ctx):
     _login(c)
     html = c.get('/admin/vendors/V3TEST01').get_data(as_text=True)
     assert 'id="slots"' in html and '/admin/vendors/V3TEST01/live.json' in html and 'insuranceplus_wordmark_white.svg' in html
+
+
+def test_live_box_has_a_row_per_file_that_lands_with_its_name(ctx):
+    st, c, d, calls = ctx
+    _login(c)
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    c.post('/V3TEST01/presence', json={'step': 1, 'selected': ['aia', 'tal'], 'items': [
+        {'id': 'cid-000001', 'insurer': 'aia', 'state': 'received', 'fraction': 1},
+        {'id': 'cid-000002', 'insurer': 'tal', 'state': 'uploading', 'fraction': 0.7}]})
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    rows = {a['id']: a for a in b['activity']}
+    assert rows['cid-000002']['state'] == 'uploading' and rows['cid-000002']['name'] is None
+    assert rows['cid-000001']['state'] == 'received' and rows['cid-000001']['name'] == 'aia_1.xlsx' and rows['cid-000001']['policies'] > 0
+    assert [a['id'] for a in b['activity']] == ['cid-000002', 'cid-000001'], 'in progress first'
+    c.post('/V3TEST01/presence', json={'left': True, 'items': [{'id': 'cid-000002', 'insurer': 'tal', 'state': 'uploading', 'fraction': 0.7}]})
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert b['activity'][0]['state'] == 'interrupted', 'a file still in flight when the vendor leaves is shown as interrupted'
+
+
+def test_display_name_follows_hubspot(ctx):
+    st, c, d, calls = ctx
+    _login(c)
+    deals = {'deals': [{'deal_id': '287657057728', 'name': 'Renamed In HubSpot Pty Ltd', 'entity': '', 'stage': 'Valuation',
+                        'owner': 'Dee Em', 'sourcetech_url': 'https://sourcetech.onrender.com/V3TEST01', 'last_activity': None}]}
+    with mock.patch('dealtech_client.recent_deals', return_value=deals):
+        c.get('/admin')
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert b['vendor']['name'] == 'Renamed In HubSpot Pty Ltd'
+    db = st.get_db()
+    assert db.execute("SELECT vendor_name FROM vendors WHERE url_code='V3TEST01'").fetchone()[0] == 'Pytest Wealth', 'the name PavTECH files runs under never changes'
+    db.close()

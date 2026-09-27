@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e5631"/><stop offset="1" stop-color="#004223"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)"/>
+  <!-- upload: an arrow rising out of a tray -->
+  <path d="M32 13 L45 27 H37 V39 H27 V27 H19 Z" fill="#fff"/>
+  <path d="M15 40 V48 a3 3 0 0 0 3 3 H46 a3 3 0 0 0 3-3 V40" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- the insurance+ plus -->
+  <circle cx="52" cy="12" r="9" fill="#7ed957"/>
+  <path d="M52 7.5 V16.5 M47.5 12 H56.5" stroke="#004223" stroke-width="3" stroke-linecap="round"/>
+</svg>
