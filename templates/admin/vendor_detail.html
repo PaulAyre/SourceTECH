@@ -87,6 +87,7 @@ const UPLOAD_URL = '{{ upload_url }}';
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = n => new Intl.NumberFormat('en-AU').format(n || 0);
 const STATE_TEXT = { waiting: 'Waiting', ticked: 'Ticked', preparing: 'Preparing', uploading: 'Uploading', received: 'Received', failed: 'Failed' };
+const LOUD = ['needs a look', 'held names', 'personal details removed'];
 const STEP_TEXT = ['choosing insurers', 'uploading files', 'on the submitted page'];
 
 function copyLink(btn) {
@@ -107,8 +108,12 @@ function slotHtml(s) {
     }
     if (s.state === 'failed') body += `<div class="s-empty" style="color:#b00020;">A file could not be read. The vendor has been asked to try again.</div>`;
     for (const f of s.files) {
-        body += `<div class="s-file"><span class="n" title="${esc(f.name)}">${esc(f.name)}</span><span class="p">${fmt(f.policies)} policies</span></div>`;
-        body += (f.notes || []).map(n => `<span class="s-note">${esc(n)}</span>`).join('');
+        // only notes that need someone to act stay visible; routine ones sit behind the (i)
+        const loud = (f.notes || []).filter(n => LOUD.some(l => n.includes(l)));
+        const quiet = (f.notes || []).filter(n => !loud.includes(n));
+        const info = quiet.length ? ` <i class="bi bi-info-circle" style="color:#8a9a91;cursor:help;" title="${esc(quiet.join('\n'))}"></i>` : '';
+        body += `<div class="s-file"><span class="n" title="${esc(f.name)}">${esc(f.name)}${info}</span><span class="p">${fmt(f.policies)} policies</span></div>`;
+        body += loud.map(n => `<span class="s-note">${esc(n)}</span>`).join('');
     }
     if (!body) body = `<div class="s-empty">${s.state === 'ticked' ? 'The vendor has ticked this insurer, no file yet' : s.expected ? 'Expected, waiting for the vendor' : 'Waiting'}</div>`;
     return `<div class="slot ${s.state}" style="--c:${s.color}">
