@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.0.4'  # 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.0.5'  # 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):

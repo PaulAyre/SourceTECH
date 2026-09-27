@@ -80,6 +80,17 @@ def register_v3(app, d):
                 state TEXT NOT NULL DEFAULT 'pending',
                 FOREIGN KEY (vendor_id) REFERENCES vendors(id)
             )''')
+        # 3.0.5: every upload id the browser used, including a re-upload of a file we
+        # already hold. The duplicate branch used to MOVE the stored row's client_id to
+        # the new upload, so a Submit that listed both ids never saw them all arrive and
+        # waited the full grace period, then told the DM a file never finished uploading.
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS upload_client_ids (
+                vendor_id INTEGER NOT NULL,
+                client_id TEXT NOT NULL,
+                file_id INTEGER NOT NULL,
+                PRIMARY KEY (vendor_id, client_id)
+            )''')
         db.commit()
         db.close()
 
@@ -202,11 +213,11 @@ def register_v3(app, d):
         sha = hashlib.sha256(data).hexdigest()
         dup = db.execute("SELECT * FROM vendor_files WHERE vendor_id = ? AND sha256 = ?", (vendor['id'], sha)).fetchone()
         if dup:
-            if dup['client_id'] != client_id:
-                db.execute("UPDATE vendor_files SET client_id = ? WHERE id = ?", (client_id, dup['id']))
-                db.commit()
-                dup = db.execute("SELECT * FROM vendor_files WHERE id = ?", (dup['id'],)).fetchone()
+            db.execute("INSERT OR IGNORE INTO upload_client_ids (vendor_id, client_id, file_id) VALUES (?, ?, ?)",
+                       (vendor['id'], client_id, dup['id']))
+            db.commit()
             out = file_out(dup)
+            out['client_id'] = client_id   # the browser marks ITS upload as received
             db.close()
             maybe_finalize_for(vendor['id'])
             return jsonify({'success': True, 'duplicate': True, 'file': out})
@@ -322,7 +333,10 @@ def register_v3(app, d):
         if not client_ids:
             return 0
         q = ','.join('?' for _ in client_ids)
-        return db.execute(f"SELECT COUNT(DISTINCT client_id) FROM vendor_files WHERE vendor_id = ? AND client_id IN ({q})", (vendor_id, *client_ids)).fetchone()[0]
+        return db.execute(f"""SELECT COUNT(DISTINCT client_id) FROM (
+                                  SELECT client_id FROM vendor_files WHERE vendor_id = ? AND client_id IN ({q})
+                                  UNION SELECT client_id FROM upload_client_ids WHERE vendor_id = ? AND client_id IN ({q}))""",
+                          (vendor_id, *client_ids, vendor_id, *client_ids)).fetchone()[0]
 
     def maybe_finalize_for(vendor_id: int):
         db = d.get_db()

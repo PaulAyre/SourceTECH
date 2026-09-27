@@ -214,3 +214,18 @@ def test_same_data_under_two_names_is_valued_once_and_the_dm_is_told(ctx, tmp_pa
     assert wait_for(lambda: len(calls['emails']) == 1)
     notes = ' '.join(calls['emails'][0].get('extra_notes') or [])
     assert 'same policies' in notes and 'not counted twice' in notes
+
+
+def test_resubmit_listing_a_re_uploaded_duplicate_runs_straight_away(ctx):
+    """3.0.5: second visit, the page lists the file already held (old id) plus a byte-identical
+    re-upload of it (new id). Both count as arrived; nothing waits for the grace period."""
+    st, c, d, calls = ctx
+    c.post('/V3TEST01/submit-intent', json={'client_ids': ['cid-000001']})
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    assert wait_for(lambda: len(calls['batches']) == 1)
+    r = post_clean(c, 'aia_1.xlsx', client_id='cid-000002')
+    assert r.get_json()['duplicate'] and r.get_json()['file']['client_id'] == 'cid-000002'
+    c.post('/V3TEST01/submit-intent', json={'client_ids': ['cid-000001', 'cid-000002']})
+    assert wait_for(lambda: len(calls['batches']) == 2), 'both ids arrived: runs now, not after 20 minutes'
+    notes = ' '.join(' '.join(e.get('extra_notes') or []) for e in calls['emails'])
+    assert 'never finished uploading' not in notes
