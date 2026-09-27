@@ -84,6 +84,14 @@ def register_v3(app, d):
         # already hold. The duplicate branch used to MOVE the stored row's client_id to
         # the new upload, so a Submit that listed both ids never saw them all arrive and
         # waited the full grace period, then told the DM a file never finished uploading.
+        # 3.1.0: what the vendor's page is doing right now, for the admin's live board.
+        # Ticked insurers and each file's stage and progress only: never a file name.
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS vendor_presence (
+                vendor_id INTEGER PRIMARY KEY,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )''')
         db.execute('''
             CREATE TABLE IF NOT EXISTS upload_client_ids (
                 vendor_id INTEGER NOT NULL,
@@ -363,6 +371,46 @@ def register_v3(app, d):
         for vendor_id, reference, missing, expected in todo:
             if claim(reference, 'timed_out' if missing else 'finalized'):
                 start_processing(vendor_id, reference, max(missing, 0), expected)
+
+    _PRESENCE_STATES = {'stripping', 'uploading', 'received', 'failed'}
+
+    @app.route('/<url_code>/presence', methods=['POST'])
+    def v3_presence(url_code):
+        """3.1.0: the vendor page reports every few seconds (and on every change) which
+        insurers are ticked and how far each file has got, so the admin can watch it live.
+        Nothing identifying: no file names, no contents."""
+        body = request.get_json(silent=True) or {}
+        db = d.get_db()
+        vendor = vendor_or_404(db, url_code)
+        if not vendor:
+            db.close()
+            return jsonify({'error': 'Invalid link'}), 404
+        keys = d.INSURER_KEYS | {d.OTHER_KEY}
+        items = []
+        for it in (body.get('items') or [])[:200]:
+            if not isinstance(it, dict):
+                continue
+            ins = str(it.get('insurer') or '')
+            state = str(it.get('state') or '')
+            if ins not in keys or state not in _PRESENCE_STATES:
+                continue
+            try:
+                frac = max(0.0, min(1.0, float(it.get('fraction') or 0)))
+            except (TypeError, ValueError):
+                frac = 0.0
+            items.append({'id': str(it.get('id') or '')[:40], 'insurer': ins, 'state': state, 'fraction': round(frac, 2)})
+        payload = {
+            'step': max(0, min(2, int(body.get('step') or 0))) if str(body.get('step') or '0').isdigit() else 0,
+            'selected': [k for k in (body.get('selected') or []) if k in keys][:30],
+            'items': items,
+            'left': bool(body.get('left')),
+        }
+        db.execute("INSERT INTO vendor_presence (vendor_id, updated_at, payload) VALUES (?, ?, ?) "
+                   "ON CONFLICT(vendor_id) DO UPDATE SET updated_at = excluded.updated_at, payload = excluded.payload",
+                   (vendor['id'], datetime.utcnow().isoformat() + 'Z', json.dumps(payload)))
+        db.commit()
+        db.close()
+        return ('', 204)
 
     @app.route('/<url_code>/submit-intent', methods=['POST'])
     def v3_submit_intent(url_code):

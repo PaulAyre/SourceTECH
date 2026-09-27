@@ -61,3 +61,32 @@ def notify_data_received(deal_id, file_url: str, timeout: float = 10.0) -> bool:
     except requests.RequestException as e:
         logger.warning("DealTECH notify error (deal %s): %s", deal_id, e)
         return False
+
+
+# 3.1.0: SourceTECH's main page lists the most recently active HubSpot deals (via DealTECH,
+# which owns HubSpot access), each with its SourceTECH link; older deals get one on demand.
+def recent_deals(limit: int = 40, timeout: float = 20.0) -> dict:
+    """{'deals': [...]} or {'error': '...'}; never raises."""
+    if not DEALTECH_API_URL or not WEBHOOK_SECRET:
+        return {"error": "DEALTECH_API_URL / WEBHOOK_SECRET not set on SourceTECH"}
+    try:
+        r = requests.get(f"{DEALTECH_API_URL}/api/vendor-research/recent-deals", params={"limit": limit},
+                         headers={"X-Webhook-Secret": WEBHOOK_SECRET}, timeout=timeout)
+        if r.status_code != 200:
+            logger.error("recent deals: DealTECH %s %s", r.status_code, r.text[:200])
+            return {"error": f"DealTECH {r.status_code}"}
+        return r.json()
+    except requests.RequestException as e:
+        logger.error("recent deals: DealTECH unreachable: %s", e)
+        return {"error": f"DealTECH unreachable: {e}"}
+
+
+def create_link(deal_id: str, timeout: float = 30.0) -> dict:
+    if not DEALTECH_API_URL or not WEBHOOK_SECRET:
+        return {"error": "DEALTECH_API_URL / WEBHOOK_SECRET not set on SourceTECH"}
+    try:
+        r = requests.post(f"{DEALTECH_API_URL}/api/vendor-research/sourcetech-link", json={"deal_id": str(deal_id)},
+                          headers={"X-Webhook-Secret": WEBHOOK_SECRET}, timeout=timeout)
+        return r.json() if r.status_code == 200 else {"error": f"DealTECH {r.status_code}: {r.text[:200]}"}
+    except requests.RequestException as e:
+        return {"error": f"DealTECH unreachable: {e}"}

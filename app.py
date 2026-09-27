@@ -27,7 +27,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.0.5'  # 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.1.0'  # 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -397,46 +397,62 @@ def admin_logout():
 @app.route('/admin')
 @admin_required
 def admin_dashboard():
-    """Admin dashboard - overview of vendors and submissions."""
-    db = get_db()
-
-    # Get stats
-    stats = {
-        'total_vendors': db.execute("SELECT COUNT(*) FROM vendors").fetchone()[0],
-        'pending_vendors': db.execute("SELECT COUNT(*) FROM vendors WHERE status = 'pending'").fetchone()[0],
-        'processing_vendors': db.execute("SELECT COUNT(*) FROM vendors WHERE status = 'processing'").fetchone()[0],
-        'complete_vendors': db.execute("SELECT COUNT(*) FROM vendors WHERE status = 'complete'").fetchone()[0],
-    }
-
-    # Get recent submissions
-    recent_submissions = db.execute('''
-        SELECT s.*, v.vendor_name, v.dm_name, v.url_code
-        FROM submissions s
-        JOIN vendors v ON s.vendor_id = v.id
-        ORDER BY s.submitted_at DESC
-        LIMIT 10
-    ''').fetchall()
-
-    db.close()
-    return render_template('admin/dashboard.html', stats=stats, recent_submissions=recent_submissions)
+    """3.1.0: the main page IS the vendor list (one clickable row per vendor)."""
+    return admin_vendors()
 
 
 @app.route('/admin/vendors')
 @admin_required
 def admin_vendors():
-    """List all vendors."""
+    """3.1.0 (Paul, 27 Sep): the most recently active HubSpot deals, each with its SourceTECH
+    link to copy, who is on the upload page, how far the insurer slots have filled and the
+    latest PavTECH run. The whole row opens the deal's live board. Falls back to SourceTECH's
+    own vendors (and says so) if DealTECH cannot be reached."""
+    from dealtech_client import recent_deals
+    import re as _re
+    res = recent_deals(40)
     db = get_db()
-    vendors = db.execute('''
-        SELECT v.*,
-               COUNT(s.id) as submission_count,
-               MAX(s.submitted_at) as last_submission
-        FROM vendors v
-        LEFT JOIN submissions s ON v.id = s.vendor_id
-        GROUP BY v.id
-        ORDER BY v.created_at DESC
-    ''').fetchall()
+    vendors = db.execute("SELECT * FROM vendors").fetchall()
+    by_deal = {str(v['hubspot_deal_id']): v for v in vendors if v['hubspot_deal_id']}
+    by_code = {v['url_code']: v for v in vendors}
+    rows = []
+    if res.get('deals') is not None:
+        for d in res['deals']:
+            m = _re.search(r"/([A-Za-z0-9_-]{6,})/?$", d.get('sourcetech_url') or '')
+            v = by_deal.get(str(d['deal_id'])) or (by_code.get(m.group(1)) if m else None)
+            rows.append({'deal': d, 'board': vendor_board(db, v) if v else None})
+    else:
+        for v in sorted(vendors, key=lambda x: x['last_submission_at'] or x['created_at'] or '', reverse=True)[:40]:
+            rows.append({'deal': None, 'board': vendor_board(db, v)})
     db.close()
-    return render_template('admin/vendors.html', vendors=vendors)
+    return render_template('admin/vendors.html', rows=rows, error=res.get('error'), base=request.url_root.rstrip('/'))
+
+
+@app.route('/admin/deals/<deal_id>/create-link', methods=['POST'])
+@admin_required
+def admin_create_link(deal_id):
+    """3.1.0: a SourceTECH link for an older deal that never got one (written to HubSpot)."""
+    from dealtech_client import create_link
+    res = create_link(deal_id)
+    if res.get('error'):
+        logger.error("create link for deal %s failed: %s", deal_id, res['error'])
+    return redirect(url_for('admin_vendors'))
+
+
+@app.route('/admin/vendors.json')
+@admin_required
+def admin_vendors_json():
+    """3.1.0: the list refreshes itself (presence dots, slot counts) every 5 seconds."""
+    db = get_db()
+    vendors = db.execute("SELECT * FROM vendors ORDER BY COALESCE(last_submission_at, created_at) DESC").fetchall()
+    out = []
+    for v in vendors:
+        b = vendor_board(db, v)
+        out.append({'code': b['vendor']['code'], 'presence': b['presence'], 'totals': b['totals'],
+                    'slots': [{'key': s_['key'], 'state': s_['state'], 'name': s_['name'], 'badge': s_['badge'], 'color': s_['color']} for s_ in b['slots']],
+                    'latest_run': b['latest_run']})
+    db.close()
+    return jsonify(out)
 
 
 @app.route('/admin/vendors/create', methods=['GET', 'POST'])
@@ -502,57 +518,113 @@ def admin_vendor_created(url_code):
     return render_template('admin/vendor_created.html', vendor=vendor, upload_url=upload_url)
 
 
+# ---------------------------------------------------------------------------------------
+# 3.1.0 (Paul, 27 Sep 2026): the admin is a live board of a vendor's insurer slots. Expected
+# insurers are pending slots from the start; each fills as its file is prepared, uploads and
+# lands. The vendor page reports presence (see v3_api /presence); the PavTECH run is the
+# headline action. Shared by the vendors list and the vendor page.
+# ---------------------------------------------------------------------------------------
+INSURER_LOGOS = {'aia', 'tal', 'zurich', 'metlife', 'clearview', 'resolution', 'bt', 'neos'}
+NOTE_TEXT = {
+    'hidden_sheets_removed': 'hidden sheets removed', 'server_removed_personal_details': 'personal details removed on arrival',
+    'needed_column_held_names': 'a needed column held names', 'file_needs_a_look': 'file needs a look',
+    'expected_columns_missing': 'expected columns missing',
+}
+HUBSPOT_DEAL_URL = 'https://app-ap1.hubspot.com/contacts/441842857/record/0-3/'
+
+
+def _presence(db, vendor_id):
+    row = db.execute("SELECT updated_at, payload FROM vendor_presence WHERE vendor_id = ?", (vendor_id,)).fetchone() \
+        if db.execute("SELECT name FROM sqlite_master WHERE name = 'vendor_presence'").fetchone() else None
+    if not row:
+        return {'state': 'never', 'age_s': None, 'payload': {}}
+    try:
+        payload = json.loads(row['payload'])
+        age = (datetime.utcnow() - datetime.fromisoformat(row['updated_at'].rstrip('Z'))).total_seconds()
+    except (ValueError, TypeError):
+        return {'state': 'never', 'age_s': None, 'payload': {}}
+    here = age < 25 and not payload.get('left')
+    return {'state': 'here' if here else 'away', 'age_s': int(age), 'seen_at': row['updated_at'], 'payload': payload}
+
+
+def vendor_board(db, vendor):
+    """Slots, presence and the latest PavTECH run for one vendor."""
+    v = dict(vendor)
+    try:
+        expected = clean_insurer_keys(json.loads(v.get('selected_insurers') or '[]'))
+    except (ValueError, TypeError):
+        expected = []
+    pres = _presence(db, v['id'])
+    live = pres['state'] == 'here'
+    pl = pres['payload']
+    files, _total = build_working_set(db, v['id'])
+    by_ins = {}
+    for f in files:
+        f = dict(f)
+        key = f.get('insurer') or OTHER_KEY
+        try:
+            notes = [NOTE_TEXT.get(n.get('code'), str(n.get('code', '')).replace('_', ' ')) for n in json.loads(f.get('note_codes') or '[]')]
+        except (ValueError, TypeError, AttributeError):
+            notes = []
+        by_ins.setdefault(key, []).append({'name': f.get('original_filename') or f.get('filename'), 'policies': f.get('policy_count') or 0,
+                                           'uploaded_at': f.get('uploaded_at'), 'notes': [n for n in notes if n]})
+    inflight = {}
+    if live:
+        for it in pl.get('items') or []:
+            if it.get('state') in ('stripping', 'uploading', 'failed'):
+                inflight.setdefault(it['insurer'], []).append(it)
+    ticked = set(pl.get('selected') or []) if live else set()
+    order = [i['key'] for i in INSURERS] + [OTHER_KEY]
+    keys = [k for k in order if k in set(expected) | set(by_ins) | set(inflight) | ticked]
+    slots = []
+    for k in keys:
+        fl = inflight.get(k, [])
+        state = ('failed' if any(i['state'] == 'failed' for i in fl) else
+                 'uploading' if any(i['state'] == 'uploading' for i in fl) else
+                 'preparing' if fl else
+                 'received' if by_ins.get(k) else
+                 'ticked' if k in ticked else 'waiting')
+        prog = [i['fraction'] for i in fl if i['state'] != 'failed']
+        cat = next((i for i in INSURERS if i['key'] == k), None)
+        slots.append({
+            'key': k, 'name': cat['name'] if cat else 'Other / unassigned', 'badge': cat['badge'] if cat else '?',
+            'color': cat['color'] if cat else '#6b7280', 'logo': (url_for('static', filename=f'images/insurers/{k}.png') if k in INSURER_LOGOS else None),
+            'expected': k in expected, 'state': state, 'files': by_ins.get(k, []),
+            'policies': sum(x['policies'] for x in by_ins.get(k, [])),
+            'progress': round(sum(prog) / len(prog), 2) if prog else None, 'in_flight': len(fl),
+        })
+    runs = []
+    for sub in db.execute("SELECT * FROM submissions WHERE vendor_id = ? ORDER BY submitted_at DESC LIMIT 20", (v['id'],)).fetchall():
+        sub = dict(sub)
+        runs.append({'reference': sub.get('reference'), 'status': sub.get('pavtech_status'), 'batch_id': sub.get('pavtech_batch_id'),
+                     'submitted_at': sub.get('submitted_at'), 'policies': sub.get('policy_count'), 'files': sub.get('file_count'),
+                     'errors': sub.get('validation_errors'),
+                     'url': pavtech_run_url(v['vendor_name'], sub['pavtech_batch_id']) if sub.get('pavtech_batch_id') else None})
+    latest = runs[0] if runs else None
+    deal = v.get('hubspot_deal_id')
+    return {
+        'vendor': {'name': v['vendor_name'], 'code': v['url_code'], 'status': v.get('status'), 'dm': v.get('dm_name'),
+                   'deal_url': (HUBSPOT_DEAL_URL + str(deal)) if deal else None, 'created_at': v.get('created_at')},
+        'presence': {'state': pres['state'], 'age_s': pres['age_s'], 'step': pl.get('step') if live else None},
+        'slots': slots, 'latest_run': latest, 'runs': runs,
+        'totals': {'files': sum(len(s_['files']) for s_ in slots), 'policies': sum(s_['policies'] for s_ in slots),
+                   'expected': len(expected), 'expected_received': sum(1 for s_ in slots if s_['expected'] and s_['files'])},
+        'server_time': datetime.utcnow().isoformat() + 'Z',
+    }
+
+
 @app.route('/admin/vendors/<url_code>/live.json')
 @admin_required
 def admin_vendor_live(url_code):
-    """v2.5.0 (Paul, 24 Sep 2026): what the vendor is doing RIGHT NOW, for the admin page's
-    live panel. Every file as it lands (status, insurer, policy count, the validation
-    warnings and PII columns removed, i.e. the same issues PavTECH's first stage raises),
-    every submission with its PavTECH status. Polled every 5 seconds by vendor_detail.html."""
+    """3.1.0: the live board for one vendor (polled every 3 seconds by vendor_detail.html)."""
     db = get_db()
     vendor = db.execute("SELECT * FROM vendors WHERE url_code = ?", (url_code,)).fetchone()
     if not vendor:
         db.close()
         return jsonify({'error': 'no such vendor'}), 404
-    files = db.execute("SELECT * FROM vendor_files WHERE vendor_id = ? ORDER BY uploaded_at DESC", (vendor['id'],)).fetchall()
-    subs = db.execute("SELECT * FROM submissions WHERE vendor_id = ? ORDER BY submitted_at DESC", (vendor['id'],)).fetchall()
+    board = vendor_board(db, vendor)
     db.close()
-
-    def _j(v, default):
-        try:
-            return json.loads(v) if v else default
-        except Exception:
-            return default
-
-    out_files = []
-    for f in files:
-        d = dict(f)
-        pii = _j(d.get('pii_report'), {})
-        out_files.append({
-            'filename': d.get('original_filename') or d.get('filename'),
-            'insurer': d.get('insurer'),
-            'status': d.get('status'),
-            'uploaded_at': d.get('uploaded_at'),
-            'policy_count': d.get('policy_count'),
-            'size': d.get('file_size'),
-            'warnings': _j(d.get('validation_warnings'), []),
-            'pii_removed': pii.get('columns_removed', []),
-            'pii_anonymized': pii.get('columns_anonymized', []),
-            'summary': _j(d.get('processing_summary'), []),
-        })
-    out_subs = [{
-        'submitted_at': dict(s_)['submitted_at'], 'reference': dict(s_).get('reference'),
-        'pavtech_status': dict(s_).get('pavtech_status'), 'pavtech_batch_id': dict(s_).get('pavtech_batch_id'),
-        'file_count': dict(s_).get('file_count'), 'policy_count': dict(s_).get('policy_count'),
-        'errors': dict(s_).get('validation_errors'),
-    } for s_ in subs]
-    return jsonify({
-        'vendor': {'name': vendor['vendor_name'], 'status': vendor['status'],
-                   'last_submission_at': vendor['last_submission_at'],
-                   'hubspot_deal_id': vendor['hubspot_deal_id'] if 'hubspot_deal_id' in vendor.keys() else None},
-        'files': out_files, 'submissions': out_subs,
-        'server_time': datetime.utcnow().isoformat() + 'Z',
-    })
+    return jsonify(board)
 
 
 @app.route('/admin/vendors/<url_code>')

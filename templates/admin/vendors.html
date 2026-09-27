@@ -1,71 +1,124 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Vendors - SourceTECH Admin{% endblock %}
+{% block title %}Deals - SourceTECH{% endblock %}
+
+{% block admin_head %}
+<style>
+    .v-row, .v-head { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.9fr) minmax(0, 1.7fr) 150px; gap: 0.9rem; align-items: center; padding: 0.6rem 0.9rem; }
+    .v-row { border-bottom: 1px solid #eef2ef; color: inherit; }
+    .v-row.go { cursor: pointer; }
+    .v-row.go:hover { background: #f1f8f4; }
+    .v-row:last-child { border-bottom: none; }
+    .v-head { padding-top: 0.4rem; padding-bottom: 0.4rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: #6c757d; background: #f8faf9; border-bottom: 1px solid #eef2ef; }
+    .v-name { font-weight: 600; color: #004223; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .v-meta { font-size: 0.74rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .v-stage { font-size: 0.68rem; font-weight: 600; color: #1e5631; background: #e8f5e9; border-radius: 999px; padding: 0.05rem 0.45rem; }
+    .v-slots { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+    .chip { font-size: 0.66rem; font-weight: 700; border-radius: 5px; padding: 0.12rem 0.38rem; border: 1px dashed #b8c4bc; color: #8a9a91; background: #fff; }
+    .chip.received { border: 1px solid transparent; color: #fff; }
+    .chip.preparing, .chip.uploading { border: 1px solid #22c55e; color: #1e5631; background: #eafbf0; }
+    .chip.failed { border: 1px solid #dc3545; color: #dc3545; }
+    .chip.ticked { border-style: solid; }
+    .v-link { display: flex; gap: 0.3rem; align-items: center; min-width: 0; }
+    .v-link code { font-size: 0.72rem; color: #555; background: #f3f5f4; border-radius: 4px; padding: 0.15rem 0.35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .v-run .btn { font-size: 0.76rem; white-space: nowrap; width: 100%; }
+    @media (max-width: 900px) { .v-row { grid-template-columns: minmax(0, 1fr); } .v-head { display: none; } }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Vendors</h2>
-    <a href="{{ url_for('admin_create_vendor') }}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> New Vendor
-    </a>
-</div>
-
-<div class="card">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-            <thead>
-                <tr>
-                    <th>Vendor Name</th>
-                    <th>DM</th>
-                    <th>Status</th>
-                    <th>Submissions</th>
-                    <th>Created</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for vendor in vendors %}
-                <tr>
-                    <td>
-                        <strong>{{ vendor.vendor_name }}</strong>
-                        <br>
-                        <small class="text-muted">{{ vendor.url_code }}</small>
-                    </td>
-                    <td>
-                        {{ vendor.dm_name }}
-                        <br>
-                        <small class="text-muted">{{ vendor.dm_email }}</small>
-                    </td>
-                    <td>
-                        {% if vendor.status == 'complete' %}
-                            <span class="badge bg-success">Complete</span>
-                        {% elif vendor.status == 'processing' %}
-                            <span class="badge bg-info">Processing</span>
-                        {% elif vendor.status == 'error' %}
-                            <span class="badge bg-danger">Error</span>
-                        {% else %}
-                            <span class="badge bg-warning">Pending</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ vendor.submission_count or 0 }}</td>
-                    <td>{{ vendor.created_at[:10] if vendor.created_at else '-' }}</td>
-                    <td>
-                        <a href="{{ url_for('admin_vendor_detail', url_code=vendor.url_code) }}"
-                           class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-eye"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
-                        No vendors yet.
-                        <a href="{{ url_for('admin_create_vendor') }}">Create one</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+{% if error %}<div class="alert alert-warning py-2 small">Could not load the recent HubSpot deals ({{ error }}). Showing SourceTECH's own vendors instead.</div>{% endif %}
+<div class="pv-card">
+    <div class="pv-head">
+        <span><i class="bi bi-lightning-charge me-2"></i>Most recently active deals <span class="sub">&middot; copy a link to send, or click a row to watch that deal live</span></span>
+        <a href="{{ url_for('admin_create_vendor') }}" class="btn btn-sm btn-light" style="font-size:0.76rem;"><i class="bi bi-plus-circle me-1"></i>Link without a deal</a>
     </div>
+    <div class="v-head"><span>Deal</span><span>Insurer files</span><span>SourceTECH link</span><span>Valuation</span></div>
+    {% for r in rows %}
+    {% set b = r.board %}{% set d = r.deal %}
+    {% set link = (d.sourcetech_url if d and d.sourcetech_url else (base ~ '/' ~ b.vendor.code if b else '')) %}
+    <div class="v-row {{ 'go' if b }}" {% if b %}data-code="{{ b.vendor.code }}" role="link" tabindex="0" onclick="location.href='{{ url_for('admin_vendor_detail', url_code=b.vendor.code) }}'"{% endif %}>
+        <div style="min-width:0;">
+            <div class="v-name">
+                <span class="dot {{ 'here' if b and b.presence.state == 'here' }}" data-dot title="{{ 'On the upload page now' if b and b.presence.state == 'here' else 'Not on the upload page' }}"></span>
+                {{ (d.name if d else b.vendor.name) }}
+            </div>
+            <div class="v-meta">
+                {% if d %}<span class="v-stage">{{ d.stage }}</span> {{ d.owner }}{% if d.last_activity %} &middot; <span data-when="{{ d.last_activity }}"></span>{% endif %}
+                {% else %}{{ b.vendor.dm or '' }}{% endif %}
+            </div>
+        </div>
+        <div class="v-slots" data-slots>
+            {% if b %}
+                {% for s in b.slots %}<span class="chip {{ s.state }}" title="{{ s.name }}: {{ s.state }}" data-color="{{ s.color }}" {% if s.state == 'received' %}style="background:{{ s.color }}"{% endif %}>{{ s.badge }}</span>{% else %}<span class="v-meta">No files yet</span>{% endfor %}
+            {% else %}<span class="v-meta">No files yet</span>{% endif %}
+        </div>
+        <div class="v-link" onclick="event.stopPropagation()">
+            {% if link %}
+                <code title="{{ link }}">{{ link }}</code>
+                <button class="btn btn-sm btn-ip-outline" title="Copy the link to send to the vendor" onclick="copyLink(this, '{{ link }}')"><i class="bi bi-clipboard"></i></button>
+            {% elif d %}
+                <form method="post" action="{{ url_for('admin_create_link', deal_id=d.deal_id) }}" style="margin:0;">
+                    <button class="btn btn-sm btn-ip-outline"><i class="bi bi-link-45deg me-1"></i>Create link</button>
+                </form>
+            {% endif %}
+        </div>
+        <div class="v-run" onclick="event.stopPropagation()" data-run>
+            {% if b and b.latest_run and b.latest_run.url %}
+                <a class="btn btn-sm btn-ip" href="{{ b.latest_run.url }}" target="_blank" rel="noopener"><i class="bi bi-graph-up-arrow me-1"></i>Open in PavTECH</a>
+            {% elif b and b.latest_run %}
+                <span class="v-meta">PavTECH: {{ b.latest_run.status or 'queued' }}</span>
+            {% else %}
+                <span class="v-meta">Not submitted yet</span>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="p-4 text-center text-muted">No deals yet.</div>
+    {% endfor %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyLink(btn, url) {
+    navigator.clipboard.writeText(url).then(() => {
+        const i = btn.querySelector('i'); i.className = 'bi bi-check2';
+        setTimeout(() => { i.className = 'bi bi-clipboard'; }, 1500);
+    });
+}
+function ago(iso) {
+    const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+function stamp() { document.querySelectorAll('[data-when]').forEach(e => { e.textContent = ago(e.dataset.when); }); }
+stamp();
+document.querySelectorAll('.v-row.go').forEach(r => r.addEventListener('keydown', e => { if (e.key === 'Enter') r.click(); }));
+// presence dots, slot chips and runs refresh every 5 seconds
+async function refresh() {
+    stamp();
+    try {
+        const r = await fetch('{{ url_for("admin_vendors_json") }}', { cache: 'no-store' });
+        if (!r.ok) return;
+        for (const v of await r.json()) {
+            const row = document.querySelector(`.v-row[data-code="${v.code}"]`);
+            if (!row) continue;
+            const dot = row.querySelector('[data-dot]');
+            dot.classList.toggle('here', v.presence.state === 'here');
+            dot.title = v.presence.state === 'here' ? 'On the upload page now' : 'Not on the upload page';
+            const box = row.querySelector('[data-slots]');
+            if (v.slots.length) box.innerHTML = v.slots.map(s =>
+                `<span class="chip ${s.state}" title="${s.name}: ${s.state}" ${s.state === 'received' ? `style="background:${s.color}"` : ''}>${s.badge}</span>`).join('');
+            const run = row.querySelector('[data-run]');
+            if (v.latest_run && v.latest_run.url && !run.querySelector('a')) {
+                run.innerHTML = `<a class="btn btn-sm btn-ip" href="${v.latest_run.url}" target="_blank" rel="noopener"><i class="bi bi-graph-up-arrow me-1"></i>Open in PavTECH</a>`;
+            }
+        }
+    } catch (_) { /* keep the page as it is */ }
+}
+setInterval(refresh, 5000);
+</script>
 {% endblock %}

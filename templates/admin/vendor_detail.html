@@ -1,208 +1,160 @@
 {% extends "admin/base.html" %}
 
-{% block title %}{{ vendor.vendor_name }} - SourceTECH Admin{% endblock %}
+{% block title %}{{ vendor.vendor_name }} - SourceTECH{% endblock %}
+
+{% block admin_head %}
+<style>
+    /* 3.1.0 (Paul, 27 Sep 2026): watch a deal fill up live. One slot per insurer: pending
+       until the vendor's file arrives, filling as it is prepared and uploaded. */
+    .b-top { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+    .b-title { font-size: 1.45rem; font-weight: 700; color: #004223; margin: 0; }
+    .b-title a { color: inherit; text-decoration: underline; text-underline-offset: 4px; }
+    .pill { font-size: 0.78rem; border-radius: 999px; padding: 0.2rem 0.65rem; background: #eef2ef; color: #555; display: inline-flex; align-items: center; gap: 0.4rem; }
+    .pill.here { background: #eafbf0; color: #1e5631; font-weight: 600; }
+    .b-actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .b-link { display: flex; align-items: center; gap: 0.3rem; background: #fff; border: 1px solid #dfe7e2; border-radius: 6px; padding: 0.2rem 0.3rem 0.2rem 0.6rem; }
+    .b-link code { font-size: 0.78rem; color: #333; }
+    .b-summary { display: flex; gap: 1.5rem; align-items: baseline; font-size: 0.85rem; color: #555; margin-bottom: 0.7rem; }
+    .b-summary b { font-size: 1.15rem; color: #004223; }
+    .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.8rem; }
+    .slot { background: #fff; border: 1px solid #dfe7e2; border-left: 5px solid var(--c); border-radius: 8px; overflow: hidden; transition: box-shadow 0.3s, border-color 0.3s; }
+    .slot.waiting { border-style: dashed; border-left-style: solid; background: #fbfcfb; }
+    .slot.waiting .s-name { color: #8a9a91; }
+    .slot.preparing, .slot.uploading { box-shadow: 0 0 0 3px rgba(34,197,94,0.25); }
+    .slot.failed { border-color: #dc3545; }
+    .s-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.7rem; border-bottom: 1px solid #f0f3f1; }
+    .s-name { font-weight: 700; color: var(--c); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s-state { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; border-radius: 999px; padding: 0.1rem 0.5rem; }
+    .s-state.waiting { background: #f1f3f2; color: #8a9a91; }
+    .s-state.ticked { background: #fff7e6; color: #8a5300; }
+    .s-state.preparing, .s-state.uploading { background: #eafbf0; color: #1e5631; }
+    .s-state.received { background: #1e5631; color: #fff; }
+    .s-state.failed { background: #fde8ea; color: #b00020; }
+    .s-body { padding: 0.5rem 0.7rem 0.6rem; font-size: 0.8rem; min-height: 3.2rem; }
+    .s-bar { height: 6px; background: #eef2ef; border-radius: 999px; overflow: hidden; margin: 0.25rem 0 0.35rem; }
+    .s-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #22c55e, #1e5631); transition: width 0.6s; }
+    .s-file { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.15rem 0; }
+    .s-file .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #333; }
+    .s-file .p { color: #1e5631; font-weight: 600; white-space: nowrap; }
+    .s-note { display: inline-block; font-size: 0.68rem; background: #fff4e0; color: #8a5300; border-radius: 4px; padding: 0.05rem 0.35rem; margin: 0.1rem 0.2rem 0 0; }
+    .s-empty { color: #8a9a91; font-size: 0.78rem; }
+    .runs { margin-top: 1rem; }
+    .run { display: flex; align-items: center; gap: 0.8rem; padding: 0.5rem 0.8rem; border-bottom: 1px solid #eef2ef; font-size: 0.84rem; }
+    .run:last-child { border-bottom: none; }
+    .run .when { color: #6c757d; min-width: 8.5rem; }
+    .run .st { font-size: 0.7rem; font-weight: 700; border-radius: 999px; padding: 0.08rem 0.5rem; background: #e8f5e9; color: #1e5631; }
+    .run .st.error, .run .st.failed { background: #fde8ea; color: #b00020; }
+    .run a { margin-left: auto; }
+    .b-foot { margin-top: 1.2rem; font-size: 0.75rem; color: #8a9a91; display: flex; justify-content: space-between; align-items: center; }
+</style>
+{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{{ url_for('admin_vendors') }}">Vendors</a></li>
-        <li class="breadcrumb-item active">{{ vendor.vendor_name }}</li>
-    </ol>
-</nav>
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">{{ vendor.vendor_name }}</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>Status:</strong>
-                            {% if vendor.status == 'complete' %}
-                                <span class="badge bg-success">Complete</span>
-                            {% elif vendor.status == 'processing' %}
-                                <span class="badge bg-info">Processing</span>
-                            {% elif vendor.status == 'error' %}
-                                <span class="badge bg-danger">Error</span>
-                            {% else %}
-                                <span class="badge bg-warning">Pending</span>
-                            {% endif %}
-                        </p>
-                        <p><strong>Account Manager:</strong> {{ vendor.dm_name }}</p>
-                        <p><strong>Email:</strong> {{ vendor.dm_email }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p><strong>Created:</strong> {{ vendor.created_at }}</p>
-                        <p><strong>Last Submission:</strong> {{ vendor.last_submission_at or 'Never' }}</p>
-                        <p><strong>Reference:</strong> <code>{{ vendor.url_code }}</code></p>
-                    </div>
-                </div>
-
-                {% if vendor.notes %}
-                <hr>
-                <p><strong>Notes:</strong></p>
-                <p class="text-muted">{{ vendor.notes }}</p>
-                {% endif %}
-            </div>
+<div class="b-top">
+    <h1 class="b-title" id="b-title">{{ vendor.vendor_name }}</h1>
+    <span class="pill" id="b-presence"><span class="dot"></span> Connecting</span>
+    <div class="b-actions">
+        <div class="b-link"><code>{{ upload_url }}</code>
+            <button class="btn btn-sm btn-ip-outline" title="Copy the link to send to the vendor" onclick="copyLink(this)"><i class="bi bi-clipboard"></i></button>
+            <a class="btn btn-sm btn-ip-outline" href="{{ upload_url }}" target="_blank" rel="noopener" title="Open the vendor's upload page"><i class="bi bi-box-arrow-up-right"></i></a>
         </div>
-
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-broadcast"></i> Live: what the vendor is uploading</span>
-                <small class="text-muted" id="live-updated">connecting</small>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-sm mb-0" id="live-files">
-                    <thead><tr><th>File</th><th>Insurer</th><th>Status</th><th>Policies</th><th>Issues raised</th><th>Uploaded</th></tr></thead>
-                    <tbody><tr><td colspan="6" class="text-center text-muted py-3">Waiting for the first upload</td></tr></tbody>
-                </table>
-            </div>
-            <div class="card-footer small text-muted" id="live-pavtech">No submission to PavTECH yet</div>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-clock-history"></i> Submission History
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Status</th>
-                            <th>Policies</th>
-                            <th>Submitted</th>
-                            <th>PavTECH</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for sub in submissions %}
-                        <tr>
-                            <td>
-                                {{ sub.original_filename or 'Unknown' }}
-                                {% if sub.validation_errors %}
-                                <br><small class="text-danger">{{ sub.validation_errors[:100] }}...</small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if sub.pavtech_status == 'complete' %}
-                                    <span class="badge bg-success">Valued</span>
-                                {% elif sub.pavtech_status == 'processing' %}
-                                    <span class="badge bg-info">Processing</span>
-                                {% elif sub.pavtech_status == 'error' %}
-                                    <span class="badge bg-danger">Error</span>
-                                {% elif sub.pavtech_status == 'validation_failed' %}
-                                    <span class="badge bg-warning">Validation Failed</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">{{ sub.pavtech_status or 'Unknown' }}</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ sub.policy_count or '-' }}</td>
-                            <td>{{ sub.submitted_at }}</td>
-                            <td>{% if sub.pavtech_batch_id %}<a href="{{ pavtech_run_url(vendor.vendor_name, sub.pavtech_batch_id) }}" target="_blank" rel="noopener">Open run {{ sub.pavtech_batch_id }}</a>{% else %}-{% endif %}</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="text-center text-muted py-4">
-                                No submissions yet
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <span id="b-run"></span>
     </div>
+</div>
+<div class="b-summary" id="b-summary"></div>
 
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">Upload Link</div>
-            <div class="card-body">
-                <div class="input-group mb-3">
-                    <input type="text" class="form-control form-control-sm" id="upload-url"
-                           value="{{ upload_url }}" readonly>
-                    <button class="btn btn-outline-primary btn-sm" type="button" onclick="copyLink()">
-                        <i class="bi bi-clipboard"></i>
-                    </button>
-                </div>
-                <a href="{{ upload_url }}" target="_blank" class="btn btn-outline-info btn-sm w-100">
-                    <i class="bi bi-box-arrow-up-right"></i> Open Upload Page
-                </a>
-                <form method="post" action="{{ url_for('admin_vendor_delete', url_code=vendor.url_code) }}" class="mt-3"
-                      onsubmit="return confirm('Delete {{ vendor.vendor_name }} and all its uploads? The link will stop working.');">
-                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">
-                        <i class="bi bi-trash"></i> Delete Vendor
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
+<div class="pv-card" style="border: none; background: transparent; box-shadow: none;">
+    <div class="slots" id="slots"></div>
+</div>
+
+<div class="pv-card runs">
+    <div class="pv-head"><span><i class="bi bi-clock-history me-2"></i>Submissions</span><span class="sub" id="b-updated"></span></div>
+    <div id="runs"><div class="run text-muted">Nothing submitted yet</div></div>
+</div>
+
+<div class="b-foot">
+    <span>Link code {{ vendor.url_code }} &middot; created {{ vendor.created_at }} &middot; DM {{ vendor.dm_name }}</span>
+    <form method="post" action="{{ url_for('admin_vendor_delete', url_code=vendor.url_code) }}" onsubmit="return confirm('Delete this vendor and its link? Uploaded files are removed.');">
+        <button class="btn btn-sm btn-link text-danger p-0" style="font-size:0.75rem;"><i class="bi bi-trash me-1"></i>Delete vendor</button>
+    </form>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// v2.5.0: live panel, polls live.json every 5 seconds so the account manager can watch
-// the vendor's files land and the issues raised on each, as it happens.
-(function () {
-    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    const badge = (s) => {
-        const m = {uploaded: 'bg-info', processing: 'bg-info', complete: 'bg-success', valued: 'bg-success', error: 'bg-danger', validation_failed: 'bg-warning'};
-        return '<span class="badge ' + (m[s] || 'bg-secondary') + '">' + esc(s || 'unknown') + '</span>';
-    };
-    let seen = 0;
-    async function tick() {
-        try {
-            const r = await fetch('{{ url_for("admin_vendor_live", url_code=vendor.url_code) }}', {cache: 'no-store'});
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const tb = document.querySelector('#live-files tbody');
-            if (!d.files.length) {
-                tb.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Waiting for the first upload</td></tr>';
-            } else {
-                tb.innerHTML = d.files.map((f) => {
-                    const issues = [].concat(f.warnings || []).concat((f.pii_removed || []).map((c) => 'PII column removed: ' + c))
-                        .concat((f.pii_anonymized || []).map((c) => 'PII column anonymised: ' + c));
-                    const issuesHtml = issues.length ? '<ul class="mb-0 ps-3 small">' + issues.map((i) => '<li>' + esc(i) + '</li>').join('') + '</ul>' : '<span class="text-muted small">none</span>';
-                    return '<tr' + (d.files.length > seen ? ' class="table-success"' : '') + '><td>' + esc(f.filename) + '</td><td>' + esc(f.insurer || '?') + '</td><td>' + badge(f.status) + '</td><td>' + esc(f.policy_count == null ? '-' : f.policy_count) + '</td><td>' + issuesHtml + '</td><td class="small text-muted">' + esc(f.uploaded_at) + '</td></tr>';
-                }).join('');
-                seen = d.files.length;
-            }
-            const sub = d.submissions[0];
-            const PAVTECH_BASE = {{ pavtech_base|tojson }};
-            const VENDOR_NAME = {{ vendor.vendor_name|tojson }};
-            const runLink = (batch) => PAVTECH_BASE && batch
-                ? ' <a href="' + PAVTECH_BASE + '/#vendor=' + encodeURIComponent(VENDOR_NAME) + '&batch=' + encodeURIComponent(batch) + '" target="_blank" rel="noopener">Open in PavTECH</a>'
-                : '';
-            document.getElementById('live-pavtech').innerHTML = sub
-                ? esc('PavTECH: ' + (sub.pavtech_status || 'queued') + (sub.pavtech_batch_id ? ' (run ' + sub.pavtech_batch_id + ')' : '') + ', submitted ' + sub.submitted_at + (sub.reference ? ', reference ' + sub.reference : '') + (sub.errors ? ', errors: ' + sub.errors : '')) + runLink(sub.pavtech_batch_id)
-                : 'No submission to PavTECH yet (files are held until the vendor presses Review and Submit)';
-            document.getElementById('live-updated').textContent = 'live, updated ' + new Date().toLocaleTimeString();
-        } catch (e) {
-            document.getElementById('live-updated').textContent = 'live update failed: ' + e.message;
-        }
-    }
-    tick(); setInterval(tick, 5000);
-})();
+const LIVE = '{{ url_for("admin_vendor_live", url_code=vendor.url_code) }}';
+const UPLOAD_URL = '{{ upload_url }}';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => new Intl.NumberFormat('en-AU').format(n || 0);
+const STATE_TEXT = { waiting: 'Waiting', ticked: 'Ticked', preparing: 'Preparing', uploading: 'Uploading', received: 'Received', failed: 'Failed' };
+const STEP_TEXT = ['choosing insurers', 'uploading files', 'on the submitted page'];
 
-function copyLink() {
-    const input = document.getElementById('upload-url');
-    input.select();
-    document.execCommand('copy');
-
-    const btn = event.target.closest('button');
-    const originalHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-check"></i>';
-    btn.classList.remove('btn-outline-primary');
-    btn.classList.add('btn-success');
-
-    setTimeout(() => {
-        btn.innerHTML = originalHtml;
-        btn.classList.remove('btn-success');
-        btn.classList.add('btn-outline-primary');
-    }, 2000);
+function copyLink(btn) {
+    navigator.clipboard.writeText(UPLOAD_URL).then(() => {
+        const i = btn.querySelector('i'); i.className = 'bi bi-check2';
+        setTimeout(() => { i.className = 'bi bi-clipboard'; }, 1500);
+    });
 }
+function ago(s) { return s < 60 ? 'seconds ago' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' days ago'; }
+function when(iso) { return iso ? new Date(iso.replace(' ', 'T') + (iso.endsWith('Z') ? '' : 'Z')).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''; }
+
+function slotHtml(s) {
+    const logo = s.logo ? `<img class="ins-logo" src="${s.logo}" alt="">` : `<span class="ins-badge" style="background:${s.color}">${esc(s.badge)}</span>`;
+    let body = '';
+    if (s.state === 'preparing' || s.state === 'uploading') {
+        const pct = Math.round((s.progress || 0) * 100);
+        body += `<div class="s-bar"><span style="width:${pct}%"></span></div><div class="s-empty">${s.state === 'preparing' ? 'Removing personal details on the vendor’s computer' : 'Uploading'} &middot; ${pct}%${s.in_flight > 1 ? ' &middot; ' + s.in_flight + ' files' : ''}</div>`;
+    }
+    if (s.state === 'failed') body += `<div class="s-empty" style="color:#b00020;">A file could not be read. The vendor has been asked to try again.</div>`;
+    for (const f of s.files) {
+        body += `<div class="s-file"><span class="n" title="${esc(f.name)}">${esc(f.name)}</span><span class="p">${fmt(f.policies)} policies</span></div>`;
+        body += (f.notes || []).map(n => `<span class="s-note">${esc(n)}</span>`).join('');
+    }
+    if (!body) body = `<div class="s-empty">${s.state === 'ticked' ? 'The vendor has ticked this insurer, no file yet' : s.expected ? 'Expected, waiting for the vendor' : 'Waiting'}</div>`;
+    return `<div class="slot ${s.state}" style="--c:${s.color}">
+        <div class="s-head">${logo}<span class="s-name">${esc(s.name)}</span><span class="s-state ${s.state}">${STATE_TEXT[s.state] || s.state}</span></div>
+        <div class="s-body">${body}</div></div>`;
+}
+
+function render(b) {
+    const v = b.vendor;
+    document.getElementById('b-title').innerHTML = v.deal_url
+        ? `<a href="${v.deal_url}" target="_blank" rel="noopener" title="Open the deal in HubSpot">${esc(v.name)}</a>` : esc(v.name);
+    const p = b.presence, pe = document.getElementById('b-presence');
+    pe.className = 'pill' + (p.state === 'here' ? ' here' : '');
+    pe.innerHTML = p.state === 'here'
+        ? `<span class="dot here"></span> Vendor is on the page now${p.step != null ? ', ' + STEP_TEXT[p.step] : ''}`
+        : p.state === 'away' ? `<span class="dot"></span> Vendor last on the page ${ago(p.age_s)}` : `<span class="dot"></span> Vendor has not opened the link yet`;
+    const r = b.latest_run;
+    document.getElementById('b-run').innerHTML = r && r.url
+        ? `<a class="btn btn-ip" href="${r.url}" target="_blank" rel="noopener"><i class="bi bi-graph-up-arrow me-1"></i>Open valuation in PavTECH</a>`
+        : r ? `<span class="pill">PavTECH: ${esc(r.status || 'queued')}</span>` : '';
+    const t = b.totals;
+    document.getElementById('b-summary').innerHTML =
+        (t.expected ? `<span><b>${t.expected_received} of ${t.expected}</b> expected insurers in</span>` : '') +
+        `<span><b>${fmt(t.files)}</b> ${t.files === 1 ? 'file' : 'files'}</span><span><b>${fmt(t.policies)}</b> ${t.policies === 1 ? 'policy' : 'policies'}</span>`;
+    document.getElementById('slots').innerHTML = b.slots.length ? b.slots.map(slotHtml).join('')
+        : '<div class="s-empty">No insurers expected yet. Slots appear as soon as the vendor ticks an insurer or uploads a file.</div>';
+    document.getElementById('b-updated').textContent = 'live, updated ' + new Date().toLocaleTimeString('en-GB');
+}
+
+async function tick() {
+    try {
+        const res = await fetch(LIVE, { cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status);
+        const b = await res.json();
+        render(b);
+        const runs = b.runs || [];
+        if (runs.length) document.getElementById('runs').innerHTML = runs.map(x => `
+            <div class="run"><span class="when">${esc(when(x.submitted_at))}</span>
+              <span>${esc(x.reference || '')}</span><span>${fmt(x.files)} ${x.files === 1 ? 'file' : 'files'} &middot; ${fmt(x.policies)} policies</span>
+              <span class="st ${esc(x.status || '')}">${esc(x.status || 'queued')}</span>
+              ${x.url ? `<a class="btn btn-sm btn-ip-outline" href="${x.url}" target="_blank" rel="noopener">Open in PavTECH</a>` : ''}</div>`).join('');
+    } catch (e) {
+        document.getElementById('b-updated').textContent = 'reconnecting';
+    }
+}
+tick();
+setInterval(tick, 3000);
 </script>
 {% endblock %}

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import InsurerCard, { InsurerLogo } from '../components/InsurerCard.jsx';
 import FileUploadZone from '../components/FileUploadZone.jsx';
 import { submitIntent, submitFinalize, getStatus } from '../lib/api.js';
+import { usePresence } from '../hooks/usePresence.js';
 
 const STEPS = ['Select Portals', 'Upload Data', 'Submitted'];
 const GREEN = '#004225';
@@ -24,6 +25,8 @@ export default function Wizard({ config, uploads }) {
   const finalized = useRef(false);
 
   useEffect(() => { if (config.pending_submission) setStep(2); else if (config.files.length) setStep(1); }, [config]);
+
+  usePresence({ step, selected, items });   // 3.1.0: the admin watches this live
 
   const toggle = (key) => setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   const shown = config.insurers.filter((i) => selected.includes(i.key));
