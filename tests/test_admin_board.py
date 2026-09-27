@@ -189,3 +189,37 @@ def test_board_shows_origin_of_each_file_in_the_next_valuation(ctx):
     b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
     assert [(f['name'], f['origin']) for f in b['next']['files']] == [('aia_1.xlsx', 'new')]
     assert b['next']['files'][0]['download'].endswith('/download')
+
+
+def test_nothing_uploaded_is_ever_deleted(ctx):
+    """3.5.1 (Paul, 27 Sep 2026): "We can't lose uploaded data". Removing, from either side,
+    only takes a file out of the next valuation; it stays visible and can be added again."""
+    st, c, d, calls = ctx
+    _login(c)
+    db = st.get_db(); vid = db.execute("SELECT id FROM vendors WHERE url_code='V3TEST01'").fetchone()[0]
+    db.execute("DELETE FROM submissions"); db.commit(); db.close()
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000001')
+    db = st.get_db(); fid, path = db.execute("SELECT id, file_path FROM vendor_files WHERE original_filename='aia_1.xlsx'").fetchone(); db.close()
+    # the vendor removes a file no run has used yet: it is kept, on disk and on record
+    r = c.delete(f'/V3TEST01/files/{fid}')
+    assert r.status_code == 200 and r.get_json().get('removed_from_next_valuation')
+    db = st.get_db(); assert db.execute("SELECT 1 FROM vendor_files WHERE id = ?", (fid,)).fetchone(); db.close()
+    from pathlib import Path as _P
+    assert _P(path).exists()
+    assert _names(st, vid) == []
+    # ...and the DM still sees it, outside every valuation, ready to add back
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert [f['name'] for f in b['loose']] == ['aia_1.xlsx'] and not b['next']['files']
+    c.post('/admin/vendors/V3TEST01/set', json={'file_id': fid, 'action': 'include'})
+    assert _names(st, vid) == ['aia_1.xlsx']
+    b = c.get('/admin/vendors/V3TEST01/live.json').get_json()
+    assert b['loose'] == []
+    # the DM takes it out again; the vendor sending the same file again puts it back
+    c.post('/admin/vendors/V3TEST01/set', json={'file_id': fid, 'action': 'exclude'})
+    assert _names(st, vid) == []
+    post_clean(c, 'aia_1.xlsx', client_id='cid-000009')
+    assert _names(st, vid) == ['aia_1.xlsx']
+    # a vendor with uploads cannot be deleted
+    assert c.post('/admin/vendors/V3TEST01/delete').status_code == 409
+    db = st.get_db(); assert db.execute("SELECT 1 FROM vendor_files WHERE id = ?", (fid,)).fetchone(); db.close()
+    assert 'Delete link' not in c.get('/admin/vendors/V3TEST01').get_data(as_text=True)

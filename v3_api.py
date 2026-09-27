@@ -239,6 +239,10 @@ def register_v3(app, d):
         if dup:
             db.execute("INSERT OR IGNORE INTO upload_client_ids (vendor_id, client_id, file_id) VALUES (?, ?, ?)",
                        (vendor['id'], client_id, dup['id']))
+            # 3.5.1: the same file sent again after it was taken out goes back into the next valuation
+            db.execute("DELETE FROM set_overrides WHERE vendor_id = ? AND file_id = ? AND action = 'exclude'", (vendor['id'], dup['id']))
+            if dup['id'] not in {f['id'] for f in d.next_set(db, vendor['id'])}:
+                db.execute("INSERT OR REPLACE INTO set_overrides (vendor_id, file_id, action) VALUES (?, ?, 'include')", (vendor['id'], dup['id']))
             db.commit()
             out = file_out(dup)
             out['client_id'] = client_id   # the browser marks ITS upload as received

@@ -28,7 +28,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.5.0'  # 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.5.1'  # 3.5.1: nothing uploaded is ever deleted (removing only takes a file out of the next valuation; files in no run shown to the DM as 'Not in any valuation'; delete vendor refused once files exist); 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -631,6 +631,12 @@ def vendor_board(db, vendor):
     latest = runs[0] if runs else None
     nxt, origin = next_set(db, v['id'], with_origin=True)
     next_files = [c for c in (file_card(r['id'], origin.get(r['id'])) for r in nxt) if c]
+    # 3.5.1: every upload stays reachable. Files in neither the next valuation nor any run
+    # shown (taken out before a run used them) are listed so the DM can add them back.
+    shown = {f['id'] for f in next_files} | {f['id'] for x in runs for f in x['file_list']}
+    loose = [c for c in (file_card(r['id']) for r in db.execute(
+        "SELECT id FROM vendor_files WHERE vendor_id = ? ORDER BY uploaded_at DESC, id DESC", (v['id'],)).fetchall()
+        if r['id'] not in shown) if c]
     # 3.3.0: one row per file in the vendor's current session, from their page's reports,
     # joined to what landed (by the upload's client id) for the stored name and policy count.
     activity = []
@@ -662,6 +668,7 @@ def vendor_board(db, vendor):
     return {
         'next': {'files': next_files, 'policies': sum(f['policies'] for f in next_files),
                  'running': v.get('status') == 'processing'},
+        'loose': loose,
         'activity': activity,
         'inbox': inbox,
         'vendor': {'name': v.get('deal_name') or v['vendor_name'], 'code': v['url_code'], 'status': v.get('status'), 'dm': v.get('dm_name'),
@@ -795,11 +802,12 @@ def admin_vendor_detail(url_code):
         WHERE vendor_id = ?
         ORDER BY submitted_at DESC
     ''', (vendor['id'],)).fetchall()
+    has_files = bool(db.execute("SELECT 1 FROM vendor_files WHERE vendor_id = ? LIMIT 1", (vendor['id'],)).fetchone())
 
     db.close()
 
     upload_url = request.url_root.rstrip('/') + '/' + url_code
-    return render_template('admin/vendor_detail.html', vendor=vendor, submissions=submissions, upload_url=upload_url,
+    return render_template('admin/vendor_detail.html', vendor=vendor, submissions=submissions, upload_url=upload_url, has_files=has_files,
                            pavtech_base=(PAVTECH_API_URL or '').rstrip('/'), pavtech_run_url=pavtech_run_url)
 
 
@@ -816,7 +824,11 @@ def admin_vendor_delete(url_code):
         db.close()
         return redirect(url_for('admin_vendors'))
     vid = vendor['id']
-    db.execute("DELETE FROM vendor_files WHERE vendor_id = ?", (vid,))
+    # 3.5.1 (Paul, 27 Sep 2026): uploaded data is never lost. Only a link nobody uploaded to
+    # can be deleted.
+    if db.execute("SELECT 1 FROM vendor_files WHERE vendor_id = ? LIMIT 1", (vid,)).fetchone():
+        db.close()
+        return jsonify({'error': 'This vendor has uploaded files, which are never deleted.'}), 409
     db.execute("DELETE FROM submissions WHERE vendor_id = ?", (vid,))
     db.execute("DELETE FROM vendors WHERE id = ?", (vid,))
     db.commit()
@@ -1297,11 +1309,9 @@ def handle_upload(url_code):
             "SELECT * FROM vendor_files WHERE id = ? AND vendor_id = ?",
             (replace_file_id, vendor['id'])
         ).fetchone()
-        if old_file:
-            old_path = Path(old_file['file_path'])
-            if old_path.exists():
-                old_path.unlink()
-            db.execute("DELETE FROM vendor_files WHERE id = ?", (replace_file_id,))
+        if old_file:   # 3.5.1: kept on record, only taken out of the next valuation
+            db.execute("INSERT OR REPLACE INTO set_overrides (vendor_id, file_id, action) VALUES (?, ?, 'exclude')",
+                       (vendor['id'], replace_file_id))
 
     # Save to database
     db.execute('''
@@ -1377,27 +1387,13 @@ def delete_file(url_code, file_id):
         db.close()
         return jsonify({'error': 'File not found'}), 404
 
-    # 3.5.0: a file an earlier valuation used stays on record (that run's history); it is
-    # only taken out of the next valuation. A file no run has used is deleted as before.
-    used = db.execute("SELECT 1 FROM run_files WHERE file_id = ? LIMIT 1", (file_id,)).fetchone() \
-        if db.execute("SELECT name FROM sqlite_master WHERE name = 'run_files'").fetchone() else None
-    if used:
-        db.execute("INSERT OR REPLACE INTO set_overrides (vendor_id, file_id, action) VALUES (?, ?, 'exclude')", (vendor['id'], file_id))
-        db.commit()
-        db.close()
-        return jsonify({'success': True, 'removed_from_next_valuation': file_record['original_filename']})
-
-    # Delete physical file
-    file_path = Path(file_record['file_path'])
-    if file_path.exists():
-        file_path.unlink()
-
-    # Delete from database
-    db.execute("DELETE FROM vendor_files WHERE id = ?", (file_id,))
+    # 3.5.1 (Paul, 27 Sep 2026: "We can't lose uploaded data"): nothing uploaded is ever
+    # deleted. Removing a file only takes it out of the next valuation; the DM still sees it
+    # and can add it to any run.
+    db.execute("INSERT OR REPLACE INTO set_overrides (vendor_id, file_id, action) VALUES (?, ?, 'exclude')", (vendor['id'], file_id))
     db.commit()
     db.close()
-
-    return jsonify({'success': True, 'deleted': file_record['original_filename']})
+    return jsonify({'success': True, 'removed_from_next_valuation': file_record['original_filename']})
 
 
 @app.route('/<url_code>/review')

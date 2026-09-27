@@ -89,14 +89,19 @@
     </div>
 </div>
 
+<div id="loose-wrap" style="display:none;">
+    <div class="runs-title"><i class="bi bi-archive me-2"></i>Not in any valuation <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;">&middot; taken out before a run used them; nothing uploaded is ever deleted</span></div>
+    <div class="pv-card run-card"><div class="set-body" style="min-height:0;"><div class="f-grid" id="loose"></div></div></div>
+</div>
+
 <div class="runs-title"><i class="bi bi-clock-history me-2"></i>Earlier valuations <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;">&middot; drag a file into the box above (or press +) to include it</span></div>
 <div class="runs-grid" id="runs"><div class="set-empty">Nothing valued yet.</div></div>
 
 <div class="b-foot">
     <span>Link code {{ vendor.url_code }} &middot; created {{ vendor.created_at }} &middot; DM {{ vendor.dm_name }}</span>
-    <form method="post" action="{{ url_for('admin_vendor_delete', url_code=vendor.url_code) }}" onsubmit="return confirm('Delete this vendor and its link? Uploaded files are removed.');">
-        <button class="btn btn-sm btn-link text-danger p-0" style="font-size:0.75rem;"><i class="bi bi-trash me-1"></i>Delete vendor</button>
-    </form>
+    {% if not has_files %}<form method="post" action="{{ url_for('admin_vendor_delete', url_code=vendor.url_code) }}" onsubmit="return confirm('Delete this link? Nobody has uploaded to it yet.');">
+        <button class="btn btn-sm btn-link text-danger p-0" style="font-size:0.75rem;"><i class="bi bi-trash me-1"></i>Delete link</button>
+    </form>{% endif %}
 </div>
 {% endblock %}
 
@@ -164,6 +169,10 @@ function render(b) {
     const btn = document.getElementById('run-btn');
     btn.disabled = busy || b.next.running || !b.next.files.length;
     btn.innerHTML = b.next.running ? '<i class="bi bi-hourglass-split me-1"></i>Valuing&hellip;' : '<i class="bi bi-play-fill me-1"></i>Run valuation';
+
+    const loose = b.loose || [];
+    document.getElementById('loose-wrap').style.display = loose.length ? '' : 'none';
+    document.getElementById('loose').innerHTML = loose.map(f => fileRow(f, 'run')).join('');
 
     // earlier valuations: the same file groups, with their results
     document.getElementById('runs').innerHTML = (b.runs || []).length ? b.runs.map(x => {
