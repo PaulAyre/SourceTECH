@@ -94,6 +94,13 @@
     <div class="pv-card run-card"><div class="set-body" style="min-height:0;"><div class="f-grid" id="loose"></div></div></div>
 </div>
 
+<!-- 3.6.0 (Paul, 29 Sep 2026): the same vendor details and documents panel as the PavTECH run page -->
+<div class="runs-title"><i class="bi bi-file-earmark-text me-2"></i>Vendor details and documents <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;" id="docs-sub">&middot; from the latest valuation; saves to HubSpot, the same panel as in PavTECH</span></div>
+<div class="pv-card docs-card">
+    <div class="set-empty" id="docs-empty">The vendor details and documents (Committee Submission, Acquisition Deed, RCTI, Undertaking, Client Transfer Deed, Vendor Direction) appear here after the first valuation.</div>
+    <iframe id="docs-frame" title="Vendor details and documents" style="display:none;width:100%;border:0;height:760px;"></iframe>
+</div>
+
 <div class="runs-title"><i class="bi bi-clock-history me-2"></i>Earlier valuations <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;">&middot; drag a file into the box above (or press +) to include it</span></div>
 <div class="runs-grid" id="runs"><div class="set-empty">Nothing valued yet.</div></div>
 
@@ -108,6 +115,22 @@
 {% block scripts %}
 <script>
 const LIVE = '{{ url_for("admin_vendor_live", url_code=vendor.url_code) }}';
+const PAVTECH_ORIGIN = (() => { try { return new URL('{{ pavtech_base }}').origin; } catch (e) { return ''; } })();
+window.addEventListener('message', e => {   // 3.6.0: the embedded PavTECH panel reports its height
+    if (!PAVTECH_ORIGIN || e.origin !== PAVTECH_ORIGIN || !e.data || !e.data.pavtechEmbedHeight) return;
+    document.getElementById('docs-frame').style.height = Math.max(300, e.data.pavtechEmbedHeight + 16) + 'px';
+});
+function showDocuments(b) {
+    const runs = b.runs || [];
+    const run = runs.find(x => x.url && x.results) || runs.find(x => x.url);
+    const fr = document.getElementById('docs-frame');
+    document.getElementById('docs-empty').style.display = run ? 'none' : '';
+    if (!run) { fr.style.display = 'none'; return; }
+    const src = run.url + '&embed=documents';
+    if (fr.dataset.src !== src) { fr.dataset.src = src; fr.src = src; }   // only when the run changes
+    fr.style.display = '';
+    document.getElementById('docs-sub').innerHTML = `&middot; from the valuation of ${esc(run.submitted_at || '')}; saves to HubSpot, the same panel as in PavTECH`;
+}
 const SET = '{{ url_for("admin_set_change", url_code=vendor.url_code) }}';
 const RUN = '{{ url_for("admin_run_valuation", url_code=vendor.url_code) }}';
 const UPLOAD_URL = '{{ upload_url }}';
@@ -173,6 +196,8 @@ function render(b) {
     const loose = b.loose || [];
     document.getElementById('loose-wrap').style.display = loose.length ? '' : 'none';
     document.getElementById('loose').innerHTML = loose.map(f => fileRow(f, 'run')).join('');
+
+    showDocuments(b);   // 3.6.0
 
     // earlier valuations: the same file groups, with their results
     document.getElementById('runs').innerHTML = (b.runs || []).length ? b.runs.map(x => {

@@ -2,7 +2,7 @@
 SourceTECH - Vendor Portfolio Upload Portal
 Main Flask application
 """
-from flask import Flask, request, render_template, redirect, url_for, jsonify, session, send_from_directory, send_file
+from flask import Flask, request, render_template, redirect, url_for, jsonify, session, send_from_directory, send_file, abort
 from functools import wraps
 from werkzeug.utils import secure_filename
 from validator import validate_portfolio_file
@@ -28,7 +28,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.5.1'  # 3.5.1: nothing uploaded is ever deleted (removing only takes a file out of the next valuation; files in no run shown to the DM as 'Not in any valuation'; delete vendor refused once files exist); 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.6.0'  # 3.6.0: the HubSpot 'PavTECH Admin' link opens /admin/deal/<HubSpot id> (this deal's page, a SourceTECH link made if missing; login returns to it); the deal page embeds PavTECH's vendor details and documents panel (settlement pack, same code as the PavTECH run page); 3.5.1: nothing uploaded is ever deleted (removing only takes a file out of the next valuation; files in no run shown to the DM as 'Not in any valuation'; delete vendor refused once files exist); 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -370,6 +370,8 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get('admin_logged_in'):
+            if request.method == 'GET' and request.path.startswith('/admin/'):
+                session['after_login'] = request.full_path.rstrip('?')   # 3.6.0: back to the deal after logging in
             return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -382,6 +384,9 @@ def admin_login():
     if request.method == 'POST':
         if request.form.get('password') == ADMIN_PASSWORD:
             session['admin_logged_in'] = True
+            nxt = session.pop('after_login', '') or ''
+            if nxt.startswith('/admin/') and not nxt.startswith('//'):
+                return redirect(nxt)
             return redirect(url_for('admin_dashboard'))
         error = 'Invalid password'
     return render_template('admin/login.html', error=error)
@@ -434,6 +439,33 @@ def admin_vendors():
             rows.append({'deal': None, 'board': vendor_board(db, v)})
     db.close()
     return render_template('admin/vendors.html', rows=rows, error=res.get('error'), base=request.url_root.rstrip('/'))
+
+
+@app.route('/admin/deal/<hs_deal_id>')
+@admin_required
+def admin_deal(hs_deal_id):
+    """3.6.0 (Paul, 29 Sep 2026): the HubSpot 'PavTECH Admin' link. Opens this deal's page:
+    every PavTECH run, the vendor details and the documents. A deal with no SourceTECH link
+    yet gets one (DealTECH creates it and writes it to HubSpot), then opens."""
+    import re as _re
+    if not _re.fullmatch(r'\d{3,20}', str(hs_deal_id)):
+        abort(404)
+    db = get_db()
+    row = db.execute("SELECT url_code FROM vendors WHERE hubspot_deal_id = ? ORDER BY id DESC LIMIT 1",
+                     (str(hs_deal_id),)).fetchone()
+    db.close()
+    if row:
+        return redirect(url_for('admin_vendor_detail', url_code=row['url_code']))
+    from dealtech_client import create_link
+    res = create_link(hs_deal_id)
+    if res.get('error'):
+        logger.error("PavTECH Admin link: no SourceTECH link for deal %s and creating one failed: %s", hs_deal_id, res['error'])
+        return render_template('error.html', message=f"This HubSpot deal ({hs_deal_id}) has no SourceTECH page yet, "
+                               f"and one could not be created: {res['error']}"), 502
+    code = res.get('url_code') or (_re.search(r"/([A-Za-z0-9_-]{6,})/?$", res.get('sourcetech_url') or res.get('upload_url') or '') or [None, None])[1]
+    if code:
+        return redirect(url_for('admin_vendor_detail', url_code=code))
+    return redirect(url_for('admin_vendors'))
 
 
 @app.route('/admin/deals/<deal_id>/create-link', methods=['POST'])
