@@ -28,7 +28,7 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 
 # Single source of truth for the app version: /health, page titles and the
 # static-asset cache-buster all read this.
-APP_VERSION = '3.6.0'  # 3.6.0: the HubSpot 'PavTECH Admin' link opens /admin/deal/<HubSpot id> (this deal's page, a SourceTECH link made if missing; login returns to it); the deal page embeds PavTECH's vendor details and documents panel (settlement pack, same code as the PavTECH run page); 3.5.1: nothing uploaded is ever deleted (removing only takes a file out of the next valuation; files in no run shown to the DM as 'Not in any valuation'; delete vendor refused once files exist); 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
+APP_VERSION = '3.7.0'  # 3.7.0 (Tom, 1 Oct 2026): PPS Mutual has its own insurer slot (picks go to PavTECH as 'PPS Mutual'); the NEOS slot no longer mentions NobleOak; the vendor page shows each insurer's real mark (badge if none); admin search box filters whatever the page shows; the deal page's vendor details panel folds to a strip (remembered per browser); 3.6.0: the HubSpot 'PavTECH Admin' link opens /admin/deal/<HubSpot id> (this deal's page, a SourceTECH link made if missing; login returns to it); the deal page embeds PavTECH's vendor details and documents panel (settlement pack, same code as the PavTECH run page); 3.5.1: nothing uploaded is ever deleted (removing only takes a file out of the next valuation; files in no run shown to the DM as 'Not in any valuation'; delete vendor refused once files exist); 3.5.0: one next-valuation box (last run + this visit, add from earlier runs by drag, remove on either side), run again from the board, past runs as file groups with their results; 3.4.0: Inbox tile (all insurers, knocked off as the vendor chooses), per-file bars in each slot, 'Awaiting file' before any upload, redacted-file download for the admin; 3.3.1: server PII re-check streams (a 15,600-row book no longer kills the 512MB server: 445MB -> 90MB); live box shows this visit's files only; 3.3.0: live-uploads box (every file's own progress and landing), names follow HubSpot, SourceTECH favicon; 3.2.0: several files per insurer never overwrite; a file with the same name as one already on the link is not sent again and the vendor is told (name fingerprint, the name never leaves the browser); 3.1.1: routine file notes behind an (i), only notes needing action stay visible; 3.1.0: admin rebuilt (PavTECH look, recent HubSpot deals as the main page, live insurer-slot board, vendor presence); 3.0.5: re-uploading a file already held counts as arrived and never steals the older upload's id (a Submit waited 20 minutes and misreported a missing file); 3.0.4: the same data uploaded under two names is valued once and the DM is told; 3.0.3: each file's vendor-picked insurer goes to PavTECH as a confirmed pick; 3.0.2: admin vendor page links each run to the PavTECH web app; 3.0.1: DealTECH data-received webhook path fixed
 
 
 def pavtech_run_url(vendor_name, batch_id, base=None):
@@ -199,8 +199,8 @@ INSURERS = [
         "hint": "BT insurance admin has transferred to Australian Group Insurances (AGI) since Aug 2025.",
     },
     {
-        "key": "neos", "name": "NobleOak / NEOS", "badge": "NEO", "color": "#2e5090",
-        "search": "nobleoak neos futura",
+        "key": "neos", "name": "NEOS", "badge": "NEO", "color": "#2e5090",
+        "search": "neos futura",
         "portal_url": "https://portal.neoslife.com.au/",
         "steps": [
             "Log in to the <strong>NEOS Adviser Portal</strong>",
@@ -209,7 +209,22 @@ INSURERS = [
             "Drop the downloaded file in the box below",
         ],
         "format": "Formats: Contact adviser services",
-        "hint": "NobleOak advised channel operates through NEOS / Futura Protection platforms.",
+        "hint": "",
+    },
+    {
+        # 3.7.0 (Tom, 1 Oct 2026): PPS Mutual gets its own slot. PavTECH values PPS files
+        # with its own parser (chosen by filename or columns); the pick labels the file.
+        "key": "pps", "name": "PPS Mutual", "badge": "PPS", "color": "#1b2140",
+        "search": "pps mutual pps",
+        "portal_url": "https://www.pps.com.au/",
+        "steps": [
+            "Log in to the <strong>PPS Mutual adviser portal</strong>",
+            "Find your <strong>in-force benefits</strong> report",
+            "Download the report as Excel or CSV",
+            "Drop the downloaded file in the box below",
+        ],
+        "format": "Formats: Excel, CSV",
+        "hint": "",
     },
 ]
 
@@ -220,6 +235,7 @@ INSURER_NAME_BY_KEY = {ins["key"]: ins["name"] for ins in INSURERS}
 PAVTECH_INSURER_BY_KEY = {
     "aia": "AIA", "tal": "TAL", "zurich": "Zurich", "mlc": "MLC", "metlife": "MetLife",
     "clearview": "ClearView", "resolution": "Resolution Life", "bt": "BT Life", "neos": "NEOS",
+    "pps": "PPS Mutual",
 }
 
 # Special catch-all tag for files that do not map to any named insurer. Uploaded
@@ -564,7 +580,7 @@ def admin_vendor_created(url_code):
 # lands. The vendor page reports presence (see v3_api /presence); the PavTECH run is the
 # headline action. Shared by the vendors list and the vendor page.
 # ---------------------------------------------------------------------------------------
-INSURER_LOGOS = {'aia', 'tal', 'zurich', 'metlife', 'clearview', 'resolution', 'bt', 'neos'}
+INSURER_LOGOS = {'aia', 'tal', 'zurich', 'metlife', 'clearview', 'resolution', 'bt', 'neos', 'pps'}  # real marks from PavTECH; MLC has none yet (badge)
 NOTE_TEXT = {
     'hidden_sheets_removed': 'hidden sheets removed', 'server_removed_personal_details': 'personal details removed on arrival',
     'needed_column_held_names': 'a needed column held names', 'file_needs_a_look': 'file needs a look',
@@ -1941,6 +1957,7 @@ from v3_api import register_v3  # noqa: E402
 
 v3 = register_v3(app, SimpleNamespace(
     get_db=get_db, INSURERS=INSURERS, INSURER_KEYS=INSURER_KEYS, OTHER_KEY=OTHER_KEY, APP_VERSION=APP_VERSION,
+    INSURER_LOGOS=INSURER_LOGOS,
     insurer_label=insurer_label, clean_insurer_keys=clean_insurer_keys, insurer_profiles=insurer_profiles,
     vendor_processing_state=vendor_processing_state, get_vendor_upload_dir=get_vendor_upload_dir,
     validate_portfolio_file=validate_portfolio_file, notify_data_received=notify_data_received,

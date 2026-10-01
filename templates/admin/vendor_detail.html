@@ -56,9 +56,23 @@
     .run-res div { font-size: 0.66rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.03em; }
     .run-res b { display: block; font-size: 0.95rem; color: #004223; text-transform: none; letter-spacing: 0; }
     .run-note { font-size: 0.7rem; color: #8a9a91; padding: 0 0.7rem 0.45rem; }
+    /* 3.7.0 (Tom, 1 Oct 2026): the vendor details panel folds to a strip that still shows its
+       first rows, so it is clearly there but gives the page back */
+    .docs-title { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+    .docs-toggle { margin-left: auto; font-size: 0.74rem; }
+    .docs-clip { position: relative; }
+    .docs-more { display: none; }
+    .docs-card.folded .docs-clip { max-height: 190px; overflow: hidden; }
+    .docs-card.folded .docs-clip iframe { pointer-events: none; }
+    .docs-card.folded .docs-more { display: flex; align-items: flex-end; justify-content: center; position: absolute; inset: 0;
+        border: none; width: 100%; padding: 0 0 0.6rem; font-size: 0.82rem; font-weight: 600; color: #1e5631; cursor: pointer;
+        background: linear-gradient(180deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.92) 75%, #fff 100%); }
+    .docs-card.folded .docs-more:hover { color: #004223; text-decoration: underline; }
     .b-foot { margin-top: 1.2rem; font-size: 0.75rem; color: #8a9a91; display: flex; justify-content: space-between; align-items: center; }
 </style>
 {% endblock %}
+
+{% block search %}{% with placeholder='Search this deal', items='#set-files .f-row; #loose .f-row; #runs .run-card' %}{% include 'admin/_search.html' %}{% endwith %}{% endblock %}
 
 {% block content %}
 <div class="b-top">
@@ -95,14 +109,19 @@
 </div>
 
 <!-- 3.6.0 (Paul, 29 Sep 2026): the same vendor details and documents panel as the PavTECH run page -->
-<div class="runs-title"><i class="bi bi-file-earmark-text me-2"></i>Vendor details and documents <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;" id="docs-sub">&middot; from the latest valuation; saves to HubSpot, the same panel as in PavTECH</span></div>
-<div class="pv-card docs-card">
+<div class="runs-title docs-title"><i class="bi bi-file-earmark-text me-2"></i>Vendor details and documents <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;" id="docs-sub">&middot; from the latest valuation; saves to HubSpot, the same panel as in PavTECH</span>
+    <button type="button" class="btn btn-sm btn-ip-outline docs-toggle" id="docs-toggle" onclick="toggleDocs()"><i class="bi bi-chevron-up me-1"></i>Show less</button></div>
+<div class="pv-card docs-card" id="docs-card">
     <div class="set-empty" id="docs-empty">The vendor details and documents (Committee Submission, Acquisition Deed, RCTI, Undertaking, Client Transfer Deed, Vendor Direction) appear here after the first valuation.</div>
-    <iframe id="docs-frame" title="Vendor details and documents" style="display:none;width:100%;border:0;height:760px;"></iframe>
+    <div class="docs-clip" id="docs-clip">
+        <iframe id="docs-frame" title="Vendor details and documents" style="display:none;width:100%;border:0;height:760px;"></iframe>
+        <button type="button" class="docs-more" onclick="toggleDocs()"><i class="bi bi-chevron-down me-1"></i>Show all vendor details and documents</button>
+    </div>
 </div>
 
 <div class="runs-title"><i class="bi bi-clock-history me-2"></i>Earlier valuations <span style="font-weight:400;color:#8a9a91;font-size:0.8rem;">&middot; drag a file into the box above (or press +) to include it</span></div>
 <div class="runs-grid" id="runs"><div class="set-empty">Nothing valued yet.</div></div>
+<div class="st-search-none" id="st-search-none"></div>
 
 <div class="b-foot">
     <span>Link code {{ vendor.url_code }} &middot; created {{ vendor.created_at }} &middot; DM {{ vendor.dm_name }}</span>
@@ -120,11 +139,26 @@ window.addEventListener('message', e => {   // 3.6.0: the embedded PavTECH panel
     if (!PAVTECH_ORIGIN || e.origin !== PAVTECH_ORIGIN || !e.data || !e.data.pavtechEmbedHeight) return;
     document.getElementById('docs-frame').style.height = Math.max(300, e.data.pavtechEmbedHeight + 16) + 'px';
 });
+// 3.7.0: fold state of the vendor details panel, remembered per browser (folded by default)
+let docsFolded = true;
+try { docsFolded = localStorage.getItem('st-docs-folded') !== '0'; } catch (e) { docsFolded = true; }
+function paintDocs() {
+    document.getElementById('docs-card').classList.toggle('folded', docsFolded);
+    document.getElementById('docs-toggle').innerHTML = docsFolded ? '<i class="bi bi-chevron-down me-1"></i>Show all' : '<i class="bi bi-chevron-up me-1"></i>Show less';
+}
+function toggleDocs() {
+    docsFolded = !docsFolded;
+    try { localStorage.setItem('st-docs-folded', docsFolded ? '1' : '0'); } catch (e) {}
+    paintDocs();
+}
+paintDocs();
 function showDocuments(b) {
     const runs = b.runs || [];
     const run = runs.find(x => x.url && x.results) || runs.find(x => x.url);
     const fr = document.getElementById('docs-frame');
     document.getElementById('docs-empty').style.display = run ? 'none' : '';
+    document.getElementById('docs-toggle').style.display = run ? '' : 'none';
+    document.getElementById('docs-clip').style.display = run ? '' : 'none';
     if (!run) { fr.style.display = 'none'; return; }
     const src = run.url + '&embed=documents';
     if (fr.dataset.src !== src) { fr.dataset.src = src; fr.src = src; }   // only when the run changes

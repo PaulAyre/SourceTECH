@@ -29,6 +29,20 @@
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.55); } 70% { box-shadow: 0 0 0 7px rgba(34,197,94,0); } 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); } }
     .ins-logo { width: 22px; height: 22px; border-radius: 5px; background: #fff; border: 1px solid #e5e7eb; object-fit: contain; padding: 1px; }
     .ins-badge { width: 22px; height: 22px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 0.55rem; font-weight: 700; }
+    /* 3.7.0 (Tom, 1 Oct 2026): one search box that filters whatever the page shows */
+    .st-search { position: relative; flex: 1 1 220px; max-width: 360px; }
+    .st-search input { width: 100%; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); color: #fff;
+        border-radius: 6px; padding: 0.3rem 1.8rem 0.3rem 1.9rem; font-size: 0.86rem; outline: none; }
+    .st-search input::placeholder { color: rgba(255,255,255,0.7); }
+    .st-search input:focus { background: #fff; color: #222; }
+    .st-search input:focus::placeholder { color: #8a9a91; }
+    .st-search .bi-search { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); font-size: 0.8rem; opacity: 0.8; pointer-events: none; }
+    .st-search .clr { position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); border: none; background: none; color: inherit; opacity: 0.7; display: none; }
+    .st-search input:focus ~ .bi-search, .st-search input:focus ~ .clr { color: #555; }
+    .st-search.has .clr { display: block; }
+    .st-nohit { display: none !important; }
+    .st-search-none { display: none; padding: 1rem; text-align: center; color: #8a9a91; font-size: 0.85rem; }
+    @media (max-width: 560px) { .st-search { order: 3; flex-basis: 100%; max-width: none; } }
 </style>
 {% block admin_head %}{% endblock %}
 {% endblock %}
@@ -40,6 +54,7 @@
             <img src="{{ url_for('static', filename='images/insuranceplus_wordmark_white.svg') }}" alt="insurance+">
             <span>SourceTECH</span>
         </a>
+        {% block search %}{% endblock %}
         <nav>
             <a href="{{ url_for('admin_vendors') }}" class="{{ 'active' if request.endpoint in ('admin_vendors', 'admin_dashboard', 'admin_vendor_detail') }}"><i class="bi bi-lightning-charge me-1"></i>Deals</a>
             <a href="{{ url_for('admin_create_vendor') }}" class="{{ 'active' if request.endpoint == 'admin_create_vendor' }}"><i class="bi bi-plus-circle me-1"></i>New vendor</a>
@@ -50,4 +65,39 @@
 <div class="st-main">
     {% block content %}{% endblock %}
 </div>
+<script>
+// 3.7.0: page search. A page lists what counts as one result in data-search-items on the
+// search box (CSS selectors). Results are re-filtered whenever the page redraws itself.
+(function () {
+    const box = document.getElementById('st-search');
+    if (!box) return;
+    const wrap = box.parentElement;
+    const sels = (box.dataset.searchItems || '').split(';').map(x => x.trim()).filter(Boolean);
+    const none = document.getElementById('st-search-none');
+    let q = '';
+    try { q = sessionStorage.getItem('st-search:' + location.pathname) || ''; } catch (e) { q = ''; }
+    box.value = q;
+    const text = el => (el.textContent + ' ' + Array.from(el.querySelectorAll('[title],[alt]')).map(x => (x.title || '') + ' ' + (x.alt || '')).join(' ')).toLowerCase();
+    function apply() {
+        const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+        let shown = 0, total = 0;
+        sels.forEach(sel => document.querySelectorAll(sel).forEach(el => {
+            total++;
+            const hit = !words.length || words.every(w => text(el).includes(w));
+            el.classList.toggle('st-nohit', !hit);
+            if (hit) shown++;
+        }));
+        wrap.classList.toggle('has', !!q);
+        if (none) { none.style.display = words.length && total && !shown ? 'block' : 'none'; none.textContent = `Nothing on this page matches "${q}".`; }
+    }
+    box.addEventListener('input', () => { q = box.value; try { sessionStorage.setItem('st-search:' + location.pathname, q); } catch (e) {} apply(); });
+    box.addEventListener('keydown', e => { if (e.key === 'Escape') { box.value = ''; box.dispatchEvent(new Event('input')); } });
+    wrap.querySelector('.clr').addEventListener('click', () => { box.value = ''; box.dispatchEvent(new Event('input')); box.focus(); });
+    document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement === document.body) { e.preventDefault(); box.focus(); } });
+    let pending = false;
+    new MutationObserver(() => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; apply(); }); })
+        .observe(document.querySelector('.st-main'), { childList: true, subtree: true });
+    apply();
+})();
+</script>
 {% endblock %}

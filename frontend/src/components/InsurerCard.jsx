@@ -1,7 +1,18 @@
+import { useState } from 'react';
 import { Check } from 'lucide-react';
 
+// 3.7.0: the insurer's real mark when the server sends one; the coloured badge otherwise
+// (and if the image fails to load).
 export function InsurerLogo({ insurer, size = 8 }) {
   const px = size * 4;
+  const [broken, setBroken] = useState(false);
+  if (insurer.logo && !broken) {
+    return (
+      <img src={insurer.logo} alt={insurer.name} onError={() => setBroken(true)}
+        className="rounded flex-shrink-0 object-contain bg-white"
+        style={{ width: px, height: px, minWidth: px, maxWidth: 'none' }} />
+    );
+  }
   return (
     <div className="rounded flex items-center justify-center text-white font-bold flex-shrink-0"
       style={{ backgroundColor: insurer.color || '#004225', width: px, height: px, fontSize: px <= 24 ? 8 : 10, letterSpacing: '-0.02em' }}>

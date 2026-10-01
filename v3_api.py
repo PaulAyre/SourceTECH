@@ -170,6 +170,8 @@ def register_v3(app, d):
         insurers = [{
             'key': i['key'], 'name': i['name'], 'badge': i.get('badge', ''), 'color': i.get('color', '#004225'),
             'portal_url': i.get('portal_url', ''), 'steps': i.get('steps', []), 'format': i.get('format', ''), 'hint': i.get('hint', ''),
+            # 3.7.0 (Tom, 1 Oct 2026): the insurer's real mark on the vendor page (badge if none)
+            'logo': f"/static/images/insurers/{i['key']}.png" if i['key'] in d.INSURER_LOGOS else None,
             # header NAMES only: what the insurer's own export calls its columns
             'alternatives': [sorted(m.keys()) for m in profiles.get(i['key'], []) if isinstance(m, dict) and m],
         } for i in d.INSURERS]

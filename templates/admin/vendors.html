@@ -26,6 +26,8 @@
 </style>
 {% endblock %}
 
+{% block search %}{% with placeholder='Search these deals', items='.v-row' %}{% include 'admin/_search.html' %}{% endwith %}{% endblock %}
+
 {% block content %}
 {% if error %}<div class="alert alert-warning py-2 small">Could not load the recent HubSpot deals ({{ error }}). Showing SourceTECH's own vendors instead.</div>{% endif %}
 <div class="pv-card">
@@ -76,6 +78,7 @@
     {% else %}
     <div class="p-4 text-center text-muted">No deals yet.</div>
     {% endfor %}
+    <div class="st-search-none" id="st-search-none"></div>
 </div>
 {% endblock %}
 
